@@ -1,0 +1,22 @@
+Starting OrderServiceApplication using Java 17.0.12 with PID 18200 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting InventoryServiceApplication using Java 17.0.12 with PID 19132 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 5.528 seconds (process running for 5.942)
+Started InventoryServiceApplication in 5.051 seconds (process running for 5.463)
+Order event sent: {"orderId":19,"orderNumber":"ORD-d257d59b","userId":123,"totalAmount":60000,"items":[{"productId":2,"quantity":50,"price":1200}],"createdAt":"2026-01-26T15:27:10.2868717"}
+[SAGA] [ORDER] [ORDER:ORD-d257d59b] [ORDER_CREATED] [SUCCESS] at 2026-01-26T15:27:10.593238200
+Received order: ORD-d257d59b
+[SAGA] [INVENTORY] [ORDER:ORD-d257d59b] [RECEIVED_ORDER] [SUCCESS] at 2026-01-26T15:27:10.775421200
+[SAGA] [INVENTORY] [ORDER:ORD-d257d59b] [CHECKING_STOCK] [SUCCESS] at 2026-01-26T15:27:10.776421800
+[SAGA] [INVENTORY] [ORDER:ORD-d257d59b] [FOUND_PRODUCT_2] [SUCCESS] at 2026-01-26T15:27:11.468504
+[SAGA] [INVENTORY] [ORDER:ORD-d257d59b] [INSUFFICIENT_STOCK_PRODUCT_2] [FAILED] at 2026-01-26T15:27:11.468504
+Inventory failed event sent: {"orderId":19,"orderNumber":"ORD-d257d59b","reason":"Insufficient stock"}
+[SAGA] [INVENTORY] [ORDER:ORD-d257d59b] [EVENT_PUBLISHED_FAILED] [FAILED] at 2026-01-26T15:27:11.537506500
+Inventory FAILED for order ORD-d257d59b : Insufficient stock
+Received inventory.failed: {"orderId":19,"orderNumber":"ORD-d257d59b","reason":"Insufficient stock"}
+Order ORD-d257d59b FAILED: Insufficient stock
+[SAGA] [ORDER] [ORDER:ORD-d257d59b] [INVENTORY_FAILED] [FAILED] at 2026-01-26T15:27:11.646388500
+Starting OrderServiceApplication using Java 17.0.12 with PID 31012 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 5.833 seconds (process running for 6.257)

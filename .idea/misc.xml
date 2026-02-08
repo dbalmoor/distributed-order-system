@@ -9,6 +9,7 @@
         <option value="$PROJECT_DIR$/intentory-service/pom.xml" />
         <option value="$PROJECT_DIR$/gateway-service/pom.xml" />
         <option value="$PROJECT_DIR$/inventory-service/pom.xml" />
+        <option value="$PROJECT_DIR$/saga-orchestrator/pom.xml" />
       </list>
     </option>
   </component>

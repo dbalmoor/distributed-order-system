@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/orders")
 @RequiredArgsConstructor
@@ -59,4 +61,20 @@ public class OrderController {
 
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<OrderResponseDTO>> getOrdersByUser(
+            @PathVariable Long userId) {
+
+        return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
+    }
+
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<OrderResponseDTO> cancelOrder(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(orderService.cancelOrder(id));
+    }
+
+
 }

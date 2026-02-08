@@ -40,8 +40,6 @@ public class Order {
     @Enumerated(EnumType.STRING)
     private FulfillmentType fulfillmentType;
 
-    @Version
-    private Long version;
 
     // One Order → Many Items
     @OneToMany(
@@ -56,6 +54,10 @@ public class Order {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    @Column(name = "payment_pending")
+    private boolean paymentPending;
+
 
     @PrePersist
     void created() {

@@ -7,7 +7,10 @@ import com.deepana.orderservice.entity.Order;
 import com.deepana.orderservice.entity.OrderItem;
 import com.deepana.orderservice.entity.OrderStatus;
 
+import com.deepana.orderservice.events.OrderCreatedEvent;
+import com.deepana.orderservice.events.OrderItemEvent;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -104,4 +107,34 @@ public class OrderMapper {
                 .substring(0, 8)
                 .toUpperCase();
     }
+
+    public OrderCreatedEvent mapToEvent(Order order) {
+
+        List<OrderItemEvent> items = order.getItems().stream()
+                .map(i -> new OrderItemEvent(
+                        i.getProductId(),
+                        i.getQuantity(),
+                        i.getPrice()
+                ))
+                .toList();
+
+        // ✅ Get traceId from MDC (or fallback)
+        String traceId = MDC.get("traceId");
+
+        if (traceId == null) {
+            traceId = order.getOrderNumber(); // fallback safety
+        }
+
+        return new OrderCreatedEvent(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getUserId(),
+                order.getTotalAmount(),
+                items,
+                order.getCreatedAt(),
+                traceId // ✅ pass it
+        );
+    }
+
+
 }
