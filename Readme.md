@@ -92,9 +92,13 @@ payment.dlq
 distributed-order-system/
 │
 ├── order-service/
+
 ├── inventory-service/
+
 ├── payment-service/
+
 ├── saga-orchestrator/
+
 └── kafka/
 
 Each service contains:
