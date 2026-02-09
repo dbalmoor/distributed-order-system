@@ -1,14 +1,13 @@
 package com.deepana.inventoryservice.kafka;
 
-import com.deepana.inventoryservice.events.InventoryFailedEvent;
-import com.deepana.inventoryservice.events.InventoryReservedEvent;
+import com.deepana.inventoryservice.dto.events.InventoryFailedEvent;
+import com.deepana.inventoryservice.dto.events.InventoryReservedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
-import org.slf4j.MDC;
 
 @Slf4j
 @Component
@@ -47,6 +46,20 @@ public class InventoryEventProducer {
         } catch (Exception e) {
             log.error("Failed to send inventory failed event", e);
             throw e;
+        }
+    }
+
+    private void send(String topic, String key, Object payload) {
+
+        try {
+            String json = objectMapper.writeValueAsString(payload);
+
+            kafkaTemplate.send(topic, key, json);
+
+            log.info("Inventory Event Sent [{}] => {}", topic, json);
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }

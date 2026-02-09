@@ -1,8 +1,7 @@
 package com.deepana.inventoryservice.kafka;
 
-import com.deepana.inventoryservice.events.OrderCreatedEvent;
+import com.deepana.inventoryservice.dto.events.OrderCreatedEvent;
 import com.deepana.inventoryservice.service.InventoryService;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

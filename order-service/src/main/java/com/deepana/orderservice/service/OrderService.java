@@ -1,5 +1,7 @@
 package com.deepana.orderservice.service;
 
+import com.deepana.orderservice.commands.CancelOrderCommand;
+import com.deepana.orderservice.commands.ConfirmOrderCommand;
 import com.deepana.orderservice.dto.request.CreateOrderRequestDTO;
 import com.deepana.orderservice.dto.response.OrderResponseDTO;
 import com.deepana.orderservice.events.InventoryFailedEvent;
@@ -30,6 +32,8 @@ public interface OrderService {
     void handlePaymentFailure(PaymentFailedEvent event);
 
 
+    void confirmOrder(ConfirmOrderCommand cmd);
 
+    void cancelBySaga(CancelOrderCommand cmd);
 }
 

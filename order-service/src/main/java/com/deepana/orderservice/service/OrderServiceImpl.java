@@ -1,5 +1,7 @@
 package com.deepana.orderservice.service;
 
+import com.deepana.orderservice.commands.CancelOrderCommand;
+import com.deepana.orderservice.commands.ConfirmOrderCommand;
 import com.deepana.orderservice.common.logging.SagaLogger;
 import com.deepana.orderservice.dto.request.CreateOrderRequestDTO;
 import com.deepana.orderservice.dto.response.OrderResponseDTO;
@@ -15,6 +17,7 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -43,7 +46,7 @@ public class OrderServiceImpl implements OrderService {
             OrderCreatedEvent event =
                     orderMapper.mapToEvent(saved);
 
-            orderEventProducer.sendOrderCreatedEvent(event);
+            orderEventProducer.sendOrderCreated(event);
 
             SagaLogger.success(
                     "ORDER",
@@ -321,4 +324,53 @@ public class OrderServiceImpl implements OrderService {
             MDC.clear();
         }
     }
+
+    @Transactional
+    public void confirmOrder(ConfirmOrderCommand cmd) {
+
+        Order order =
+                orderRepository.findById(cmd.getOrderId())
+                        .orElseThrow();
+
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            return; // idempotent
+        }
+
+        order.setStatus(OrderStatus.COMPLETED);
+
+        orderRepository.save(order);
+
+        log.info("Order {} confirmed", cmd.getOrderNumber());
+    }
+
+    @Transactional
+    public void cancelBySaga(CancelOrderCommand cmd) {
+
+        Order order =
+                orderRepository.findById(cmd.getOrderId())
+                        .orElseThrow();
+
+        if (order.getStatus() == OrderStatus.CANCELLED ||
+                order.getStatus() == OrderStatus.FAILED) {
+            return;
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+
+        orderRepository.save(order);
+
+        orderEventProducer.sendOrderCancelled(
+                new OrderCancelledEvent(
+                        order.getId(),
+                        order.getOrderNumber(),
+                        cmd.getReason(),
+                        cmd.getTraceId(),
+                        LocalDateTime.now()
+                )
+        );
+
+        log.warn("Order {} cancelled by saga",
+                cmd.getOrderNumber());
+    }
+
 }

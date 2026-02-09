@@ -1,4 +1,4 @@
-package com.deepana.inventoryservice.events;
+package com.deepana.inventoryservice.dto.events;
 
 import lombok.Data;
 

@@ -2,10 +2,7 @@ package com.deepana.inventoryservice.service;
 
 import com.deepana.inventoryservice.common.logging.SagaLogger;
 import com.deepana.inventoryservice.entity.Inventory;
-import com.deepana.inventoryservice.events.InventoryFailedEvent;
-import com.deepana.inventoryservice.events.InventoryReservedEvent;
-import com.deepana.inventoryservice.events.OrderCreatedEvent;
-import com.deepana.inventoryservice.events.OrderItemEvent;
+import com.deepana.inventoryservice.dto.events.*;
 import com.deepana.inventoryservice.kafka.InventoryEventProducer;
 import com.deepana.inventoryservice.repository.InventoryRepository;
 import com.deepana.inventoryservice.repository.ProcessedOrderRepository;
@@ -13,7 +10,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.slf4j.MDC;
 
 @RequiredArgsConstructor
 @Service

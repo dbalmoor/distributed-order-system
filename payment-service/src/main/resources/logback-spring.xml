@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Console Output -->
+    <appender name="CONSOLE"
+              class="ch.qos.logback.core.ConsoleAppender">
+
+        <encoder>
+            <pattern>
+                %d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger - %msg%n
+            </pattern>
+        </encoder>
+
+    </appender>
+
+
+    <!-- Saga File Logger -->
+    <appender name="SAGA_FILE"
+              class="ch.qos.logback.core.rolling.RollingFileAppender">
+
+        <file>logs/saga.log</file>
+
+        <rollingPolicy
+                class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+
+            <fileNamePattern>
+                logs/saga.%d{yyyy-MM-dd}.log
+            </fileNamePattern>
+
+            <maxHistory>14</maxHistory>
+
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>%msg%n</pattern>
+        </encoder>
+
+    </appender>
+
+
+    <!-- Saga Package Logger -->
+    <logger name="com.deepana"
+            level="INFO"
+            additivity="false">
+
+        <appender-ref ref="SAGA_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+
+    </logger>
+
+
+    <!-- Root Logger -->
+    <root level="INFO">
+
+        <appender-ref ref="CONSOLE"/>
+
+    </root>
+
+</configuration>

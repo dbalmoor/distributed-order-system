@@ -1,5 +1,6 @@
 package com.deepana.orderservice.kafka;
 
+import com.deepana.orderservice.events.OrderCancelledEvent;
 import com.deepana.orderservice.events.OrderCreatedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -13,21 +14,49 @@ import org.springframework.stereotype.Component;
 public class OrderEventProducer {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper mapper;
 
-    private static final String TOPIC = "order.created";
-
-    public void sendOrderCreatedEvent(Object event) {
+    public void sendOrderCreated(OrderCreatedEvent event) {
 
         try {
-            String json = objectMapper.writeValueAsString(event);
 
-            kafkaTemplate.send(TOPIC, json);
+            String json = mapper.writeValueAsString(event);
 
-            log.info("Order event sent: {}", json);
+            kafkaTemplate.send(
+                    "order.created",
+                    event.getOrderNumber(),
+                    json
+            );
+
+            log.info("order.created sent {}", json);
 
         } catch (Exception e) {
-            log.error("Failed to send order event", e);
+
+            log.error("Failed to send order.created", e);
+            throw new RuntimeException(e);
         }
     }
+
+
+    public void sendOrderCancelled(OrderCancelledEvent event) {
+
+        try {
+
+            String json = mapper.writeValueAsString(event);
+
+            kafkaTemplate.send(
+                    "order.cancelled",
+                    event.getOrderNumber(),
+                    json
+            );
+
+            log.info("order.cancelled sent {}", json);
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(e);
+        }
+    }
+
+
 }

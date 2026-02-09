@@ -1,3 +1,39 @@
 spring:
   application:
     name: saga-orchestrator
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    consumer:
+      group-id: saga-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+    listener:
+      ack-mode: manual
+      missing-topics-fatal: false
+
+
+server:
+  port: 8084   # Any free port
+
+
+logging:
+  level:
+    root: INFO
+    com.deepana: DEBUG
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

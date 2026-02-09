@@ -522,8 +522,8 @@ Started InventoryServiceApplication in 3.386 seconds (process running for 3.637)
 Order event sent: {"orderId":31,"orderNumber":"ORD-1169de8d","userId":134,"totalAmount":1200,"items":[{"productId":null,"quantity":null,"price":null,"traceId":null}],"createdAt":"2026-01-29T21:18:15.8306289","traceId":"ORD-1169de8d"}
 [SAGA] [ORDER] [ORDER:ORD-1169de8d] [ORD-1169de8d] [ORDER_CREATED] at SUCCESS
 Inventory processing failed
-com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "traceId" (class com.deepana.inventoryservice.events.OrderItemEvent), not marked as ignorable (3 known properties: "price", "productId", "quantity"])
- at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 146] (through reference chain: com.deepana.inventoryservice.events.OrderCreatedEvent["items"]->java.util.ArrayList[0]->com.deepana.inventoryservice.events.OrderItemEvent["traceId"])
+com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "traceId" (class com.deepana.inventoryservice.dto.events.OrderItemEvent), not marked as ignorable (3 known properties: "price", "productId", "quantity"])
+ at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 146] (through reference chain: com.deepana.inventoryservice.dto.events.OrderCreatedEvent["items"]->java.util.ArrayList[0]->com.deepana.inventoryservice.dto.events.OrderItemEvent["traceId"])
 	at com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.from(UnrecognizedPropertyException.java:61)
 	at com.fasterxml.jackson.databind.DeserializationContext.handleUnknownProperty(DeserializationContext.java:1208)
 	at com.fasterxml.jackson.databind.deser.std.StdDeserializer.handleUnknownProperty(StdDeserializer.java:2380)
@@ -567,8 +567,8 @@ com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized f
 	at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(CompletableFuture.java:1804)
 	at java.base/java.lang.Thread.run(Thread.java:842)
 Inventory processing failed
-com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "traceId" (class com.deepana.inventoryservice.events.OrderItemEvent), not marked as ignorable (3 known properties: "price", "productId", "quantity"])
- at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 146] (through reference chain: com.deepana.inventoryservice.events.OrderCreatedEvent["items"]->java.util.ArrayList[0]->com.deepana.inventoryservice.events.OrderItemEvent["traceId"])
+com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "traceId" (class com.deepana.inventoryservice.dto.events.OrderItemEvent), not marked as ignorable (3 known properties: "price", "productId", "quantity"])
+ at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 146] (through reference chain: com.deepana.inventoryservice.dto.events.OrderCreatedEvent["items"]->java.util.ArrayList[0]->com.deepana.inventoryservice.dto.events.OrderItemEvent["traceId"])
 	at com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.from(UnrecognizedPropertyException.java:61)
 	at com.fasterxml.jackson.databind.DeserializationContext.handleUnknownProperty(DeserializationContext.java:1208)
 	at com.fasterxml.jackson.databind.deser.std.StdDeserializer.handleUnknownProperty(StdDeserializer.java:2380)
@@ -612,8 +612,8 @@ com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized f
 	at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(CompletableFuture.java:1804)
 	at java.base/java.lang.Thread.run(Thread.java:842)
 Inventory processing failed
-com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "traceId" (class com.deepana.inventoryservice.events.OrderItemEvent), not marked as ignorable (3 known properties: "price", "productId", "quantity"])
- at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 146] (through reference chain: com.deepana.inventoryservice.events.OrderCreatedEvent["items"]->java.util.ArrayList[0]->com.deepana.inventoryservice.events.OrderItemEvent["traceId"])
+com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException: Unrecognized field "traceId" (class com.deepana.inventoryservice.dto.events.OrderItemEvent), not marked as ignorable (3 known properties: "price", "productId", "quantity"])
+ at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 146] (through reference chain: com.deepana.inventoryservice.dto.events.OrderCreatedEvent["items"]->java.util.ArrayList[0]->com.deepana.inventoryservice.dto.events.OrderItemEvent["traceId"])
 	at com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.from(UnrecognizedPropertyException.java:61)
 	at com.fasterxml.jackson.databind.DeserializationContext.handleUnknownProperty(DeserializationContext.java:1208)
 	at com.fasterxml.jackson.databind.deser.std.StdDeserializer.handleUnknownProperty(StdDeserializer.java:2380)
