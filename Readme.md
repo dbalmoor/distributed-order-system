@@ -90,7 +90,9 @@ payment.dlq
 
 ## 📁 Project Structure
 distributed-order-system/
+
 │
+
 ├── order-service/
 
 ├── inventory-service/
