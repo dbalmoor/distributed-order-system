@@ -1,128 +1,278 @@
-# Distributed Order & Payment System
+📦 Distributed Order Management System using Saga Orchestration (Kafka + Spring Boot)
+📌 Overview
 
-A scalable, event-driven microservices-based backend system built using Java and Spring Boot.  
-This project simulates the core backend architecture of modern e-commerce platforms such as Amazon and Flipkart.
+This project is a distributed microservices-based order processing system built using Spring Boot and Apache Kafka, implementing the Saga Orchestration Pattern.
 
----
+It ensures data consistency across services (Order, Inventory, Payment) without using distributed transactions, by coordinating steps through a Saga Orchestrator Service.
 
-## 🚀 Tech Stack
+Each business operation is executed as a local transaction and coordinated using Kafka events and commands.
 
-- Java 17
-- Spring Boot 3
-- Spring Cloud Gateway
-- PostgreSQL
-- Redis
-- Apache Kafka
-- Docker & Docker Compose
-- JWT Security
-- Swagger (OpenAPI)
-- Prometheus & Grafana
-- JUnit & Mockito
+🏗️ Architecture
+Microservices
+Service	Responsibility
+Order Service	Manages order lifecycle
+Inventory Service	Reserves/releases stock
+Payment Service	Charges/refunds payment
+Saga Orchestrator	Controls workflow
+Kafka	Event & command broker
+Pattern Used
 
----
+✅ Saga Orchestration
 
-## 📐 Architecture Overview
+✅ Event-driven architecture
 
-Client → API Gateway → Microservices → Message Broker → Databases → Cache
+✅ Asynchronous messaging
 
-Services:
-- Order Service
-- Payment Service
-- Inventory Service
-- Gateway Service
+✅ Compensating transactions
 
-Communication: Event-driven via Kafka
+✅ Dead Letter Queues (DLQ)
 
----
+🔄 Saga Flow
+1️⃣ Order Creation
+Client → Order Service → order.created
 
-## 📦 Features
+2️⃣ Inventory Reservation
+Saga → inventory.reserve.cmd
+Inventory → inventory.reserved / inventory.failed
 
-- Order creation & tracking
-- Inventory reservation
-- Payment processing
-- Distributed transactions (Saga Pattern)
-- Retry & Dead Letter Queue
-- Idempotency handling
-- Caching with Redis
-- Circuit breaking
-- Centralized authentication
-- Monitoring & metrics
+3️⃣ Payment Processing
+Saga → payment.charge.cmd
+Payment → payment.success / payment.failed
 
----
+4️⃣ Order Completion / Rollback
+Scenario	Action
+Success	order.confirm.cmd
+Payment Failed	inventory.release.cmd + order.cancel.cmd
+Inventory Failed	order.cancel.cmd
+📊 Order Status Lifecycle
+CREATED
+INVENTORY_RESERVED
+PAYMENT_SUCCESS_PENDING
+PAYMENT_FAILED_PENDING
+FAILED
+CANCELLED
+COMPLETED
 
-## ⚙️ Project Structure
+📨 Kafka Topics
+Events
+order.created
+inventory.reserved
+inventory.failed
+payment.success
+payment.failed
+order.cancelled
 
-```
+Commands
+inventory.reserve.cmd
+inventory.release.cmd
+payment.charge.cmd
+payment.refund.cmd
+order.confirm.cmd
+order.cancel.cmd
+
+Dead Letter Queues
+order.dlq
+inventory.dlq
+payment.dlq
+
+📁 Project Structure
 distributed-order-system/
- ├── gateway-service/
- ├── order-service/
- ├── payment-service/
- ├── inventory-service/
- ├── docker-compose.yml
- └── README.md
-```
+│
+├── order-service/
+├── inventory-service/
+├── payment-service/
+├── saga-orchestrator/
+└── kafka/
 
----
 
-## ▶️ Running Locally
+Each service contains:
 
-### Prerequisites
+controller/
+service/
+repository/
+dto/
+kafka/
+config/
 
-- Java 17+
-- Docker
-- Maven
-- Git
+🧩 Saga Orchestrator
+Role
 
-### Steps
+The Saga Orchestrator:
 
-```bash
-git clone <repository-url>
-cd distributed-order-system
+Listens to business events
 
-mvn clean package -DskipTests
-docker compose build
-docker compose up
-```
+Decides next step
 
----
+Sends commands
 
-## 🔍 API Documentation
+Handles failures
 
-Swagger UI is available at:
+Triggers compensation
 
-```
-http://localhost:8081/swagger-ui.html
-```
+Main Logic
+Event	Action
+order.created	reserve inventory
+inventory.reserved	charge payment
+inventory.failed	cancel order
+payment.success	confirm order
+payment.failed	release inventory + cancel order
+💰 Money Handling
 
-(Adjust port per service)
+All monetary values use:
 
----
+java.math.BigDecimal
 
-## 🧪 Testing
 
-```bash
-mvn test
-```
+❗ Never use double or float for payments.
 
----
+🔁 Reliability Features
+1️⃣ Idempotency
 
-## 📈 Future Enhancements
+Each service prevents duplicate processing using:
 
-- Kubernetes deployment
-- Cloud hosting (AWS/GCP)
-- Distributed tracing (Zipkin)
-- ElasticSearch integration
-- Advanced fraud detection
+ProcessedOrderRepository
 
----
+2️⃣ Optimistic Locking
 
-## 👩‍💻 Author
+Used in Order Service for concurrent updates.
 
-Deepana Balmoor  
-Associate Software Engineer | Java Backend Developer
+3️⃣ Retry + DLQ
 
----
+Kafka consumers use:
 
-## 📄 License
+DefaultErrorHandler
+DeadLetterPublishingRecoverer
 
-This project is for learning and portfolio purposes.
+
+For automatic retries and DLQ routing.
+
+4️⃣ Traceability
+
+Each message carries:
+
+traceId = orderNumber
+
+
+Used with MDC logging.
+
+🧾 Logging Format
+[SAGA] [SERVICE] [TRACE] [ORDER] [STEP] [STATUS]
+
+
+Example:
+
+[SAGA] [ORDER] [TRACE:ORD-123] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS]
+
+⚙️ Technologies Used
+Tech	Purpose
+Java 17	Language
+Spring Boot 4	Framework
+Spring Kafka	Messaging
+Apache Kafka	Broker
+JPA/Hibernate	Persistence
+MySQL/Postgres	Database
+Lombok	Boilerplate reduction
+Jackson	JSON parsing
+🛠️ Configuration (application.yml example)
+spring:
+  application:
+    name: saga-orchestrator
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    consumer:
+      group-id: saga-group
+      auto-offset-reset: earliest
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+📌 Key Design Principles
+
+❌ No distributed transactions
+
+✅ Eventual consistency
+
+✅ Compensating transactions
+
+✅ Stateless orchestration
+
+✅ Loose coupling
+
+✅ Failure isolation
+
+🚧 Current Status
+Implemented
+
+✅ Order Service
+
+✅ Inventory Service
+
+✅ Payment Service (basic)
+
+✅ Saga Orchestrator
+
+✅ DLQ Handling
+
+✅ Retry Mechanism
+
+✅ BigDecimal for payments
+
+✅ Logging & tracing
+
+In Progress / Future
+
+⏳ Payment Refund Flow
+
+⏳ Saga State Persistence
+
+⏳ Monitoring Dashboard
+
+⏳ Metrics (Prometheus/Grafana)
+
+⏳ UI Client
+
+📈 Future Improvements
+
+Add Saga State Store (Redis/DB)
+
+Exactly-once semantics
+
+Kafka Streams
+
+Circuit Breakers
+
+Distributed Tracing (OpenTelemetry)
+
+Kubernetes Deployment
+
+🚀 How to Run
+1️⃣ Start Kafka
+docker-compose up
+
+2️⃣ Start Services (Order → Inventory → Payment → Saga)
+mvn spring-boot:run
+
+3️⃣ Test
+POST /orders
+
+
+Saga starts automatically.
+
+🧠 Learning Outcomes
+
+This project demonstrates:
+
+Real-world Saga implementation
+
+Kafka-based orchestration
+
+Handling race conditions
+
+Designing compensations
+
+Building fault-tolerant systems
+
+Production-grade microservices
