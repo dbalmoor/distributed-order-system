@@ -1,50 +1,65 @@
-📦 Distributed Order Management System using Saga Orchestration (Kafka + Spring Boot)
-📌 Overview
+# 📦 Distributed Order Management System  
+### Saga Orchestration with Spring Boot & Apache Kafka
 
-This project is a distributed microservices-based order processing system built using Spring Boot and Apache Kafka, implementing the Saga Orchestration Pattern.
+---
 
-It ensures data consistency across services (Order, Inventory, Payment) without using distributed transactions, by coordinating steps through a Saga Orchestrator Service.
+## 📌 Overview
 
-Each business operation is executed as a local transaction and coordinated using Kafka events and commands.
+This project is a **distributed microservices-based order processing system** built using **Spring Boot** and **Apache Kafka**, implementing the **Saga Orchestration Pattern**.
 
-🏗️ Architecture
-Microservices
-Service	Responsibility
-Order Service	Manages order lifecycle
-Inventory Service	Reserves/releases stock
-Payment Service	Charges/refunds payment
-Saga Orchestrator	Controls workflow
-Kafka	Event & command broker
-Pattern Used
+It ensures **data consistency across services** without distributed transactions by coordinating business steps using Kafka-based events and commands.
 
-✅ Saga Orchestration
+---
 
-✅ Event-driven architecture
+## 🏗️ Architecture
 
-✅ Asynchronous messaging
+### Microservices
 
-✅ Compensating transactions
+| Service | Responsibility |
+|---------|----------------|
+| Order Service | Manages order lifecycle |
+| Inventory Service | Reserves and releases stock |
+| Payment Service | Charges and refunds payments |
+| Saga Orchestrator | Controls workflow |
+| Kafka | Message broker |
 
-✅ Dead Letter Queues (DLQ)
+### Pattern Used
 
-🔄 Saga Flow
-1️⃣ Order Creation
+- ✅ Saga Orchestration  
+- ✅ Event-Driven Architecture  
+- ✅ Asynchronous Messaging  
+- ✅ Compensating Transactions  
+- ✅ Dead Letter Queues (DLQ)
+
+---
+
+## 🔄 Saga Workflow
+
+### Order Processing Flow
+
 Client → Order Service → order.created
+↓
+Saga Orchestrator
+↓
+inventory.reserve.cmd
+↓
+inventory.reserved / inventory.failed
+↓
+payment.charge.cmd
+↓
+payment.success / payment.failed
 
-2️⃣ Inventory Reservation
-Saga → inventory.reserve.cmd
-Inventory → inventory.reserved / inventory.failed
 
-3️⃣ Payment Processing
-Saga → payment.charge.cmd
-Payment → payment.success / payment.failed
+### Compensation Flow
 
-4️⃣ Order Completion / Rollback
-Scenario	Action
-Success	order.confirm.cmd
-Payment Failed	inventory.release.cmd + order.cancel.cmd
-Inventory Failed	order.cancel.cmd
-📊 Order Status Lifecycle
+| Failure | Action |
+|---------|---------|
+| Inventory Failed | Cancel Order |
+| Payment Failed | Release Inventory + Cancel Order |
+
+---
+
+## 📊 Order Status Lifecycle
 CREATED
 INVENTORY_RESERVED
 PAYMENT_SUCCESS_PENDING
@@ -53,29 +68,27 @@ FAILED
 CANCELLED
 COMPLETED
 
-📨 Kafka Topics
-Events
+### 📨 Kafka Topics
+#### Events
 order.created
 inventory.reserved
 inventory.failed
 payment.success
 payment.failed
 order.cancelled
-
-Commands
+#### Commands
 inventory.reserve.cmd
 inventory.release.cmd
 payment.charge.cmd
 payment.refund.cmd
 order.confirm.cmd
 order.cancel.cmd
-
-Dead Letter Queues
+#### Dead Letter Queues
 order.dlq
 inventory.dlq
 payment.dlq
 
-📁 Project Structure
+## 📁 Project Structure
 distributed-order-system/
 │
 ├── order-service/
@@ -83,7 +96,6 @@ distributed-order-system/
 ├── payment-service/
 ├── saga-orchestrator/
 └── kafka/
-
 
 Each service contains:
 
@@ -94,86 +106,63 @@ dto/
 kafka/
 config/
 
-🧩 Saga Orchestrator
-Role
+### 🧩 Saga Orchestrator
 
-The Saga Orchestrator:
+RESPONSIBILITIES: 
+- Listens to domain events
+- Controls workflow
+- Sends commands
+- Handles failures
+- Triggers compensation
 
-Listens to business events
-
-Decides next step
-
-Sends commands
-
-Handles failures
-
-Triggers compensation
-
-Main Logic
+### Event Handling
 Event	Action
-order.created	reserve inventory
-inventory.reserved	charge payment
-inventory.failed	cancel order
-payment.success	confirm order
-payment.failed	release inventory + cancel order
-💰 Money Handling
+order.created	- Reserve inventory
+inventory.reserved	- Charge payment
+inventory.failed	- Cancel order
+payment.success	- Confirm order
+payment.failed	- Release inventory + Cancel order
 
+
+### 💰 Payment Handling
 All monetary values use:
 
 java.math.BigDecimal
+Floating-point types are avoided to prevent precision errors.
 
+## 🔁 Reliability Features
+#### Idempotency
+Prevents duplicate processing using processed-order tracking.
 
-❗ Never use double or float for payments.
-
-🔁 Reliability Features
-1️⃣ Idempotency
-
-Each service prevents duplicate processing using:
-
-ProcessedOrderRepository
-
-2️⃣ Optimistic Locking
-
+#### Optimistic Locking
 Used in Order Service for concurrent updates.
 
-3️⃣ Retry + DLQ
+#### Retry & DLQ
+Kafka consumers use retry mechanisms and Dead Letter Queues.
 
-Kafka consumers use:
-
-DefaultErrorHandler
-DeadLetterPublishingRecoverer
-
-
-For automatic retries and DLQ routing.
-
-4️⃣ Traceability
-
+#### Distributed Tracing
 Each message carries:
 
-traceId = orderNumber
-
-
+#### traceId = orderNumber
 Used with MDC logging.
 
-🧾 Logging Format
+## 🧾 Logging Format
 [SAGA] [SERVICE] [TRACE] [ORDER] [STEP] [STATUS]
-
-
 Example:
 
 [SAGA] [ORDER] [TRACE:ORD-123] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS]
 
-⚙️ Technologies Used
-Tech	Purpose
-Java 17	Language
+## ⚙️ Technology Stack
+Technology	Purpose
+Java 17	Programming Language
 Spring Boot 4	Framework
 Spring Kafka	Messaging
 Apache Kafka	Broker
-JPA/Hibernate	Persistence
-MySQL/Postgres	Database
-Lombok	Boilerplate reduction
-Jackson	JSON parsing
-🛠️ Configuration (application.yml example)
+JPA / Hibernate	ORM
+MySQL / PostgreSQL	Database
+Lombok	Boilerplate Reduction
+Jackson	JSON Processing
+🛠️ Configuration Example
 spring:
   application:
     name: saga-orchestrator
@@ -188,29 +177,26 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+📌 Design Principles
+❌ No Distributed Transactions
 
-📌 Key Design Principles
+✅ Eventual Consistency
 
-❌ No distributed transactions
+✅ Compensating Transactions
 
-✅ Eventual consistency
+✅ Loose Coupling
 
-✅ Compensating transactions
+✅ Fault Isolation
 
-✅ Stateless orchestration
+✅ Scalability
 
-✅ Loose coupling
-
-✅ Failure isolation
-
-🚧 Current Status
-Implemented
-
+🚧 Project Status
+Completed
 ✅ Order Service
 
 ✅ Inventory Service
 
-✅ Payment Service (basic)
+✅ Payment Service
 
 ✅ Saga Orchestrator
 
@@ -218,61 +204,63 @@ Implemented
 
 ✅ Retry Mechanism
 
-✅ BigDecimal for payments
+✅ Distributed Tracing
 
-✅ Logging & tracing
+✅ Logging System
 
-In Progress / Future
-
-⏳ Payment Refund Flow
+Planned
+⏳ Payment Refund Workflow
 
 ⏳ Saga State Persistence
 
 ⏳ Monitoring Dashboard
 
-⏳ Metrics (Prometheus/Grafana)
+⏳ Metrics Integration
 
 ⏳ UI Client
 
-📈 Future Improvements
-
-Add Saga State Store (Redis/DB)
-
-Exactly-once semantics
-
-Kafka Streams
-
-Circuit Breakers
-
-Distributed Tracing (OpenTelemetry)
-
-Kubernetes Deployment
-
 🚀 How to Run
-1️⃣ Start Kafka
+1. Start Kafka
 docker-compose up
+2. Start Services
+Run in order:
 
-2️⃣ Start Services (Order → Inventory → Payment → Saga)
-mvn spring-boot:run
+order-service
+inventory-service
+payment-service
+saga-orchestrator
+3. Test
+Send request:
 
-3️⃣ Test
 POST /orders
-
-
 Saga starts automatically.
 
 🧠 Learning Outcomes
-
 This project demonstrates:
 
 Real-world Saga implementation
 
 Kafka-based orchestration
 
-Handling race conditions
+Distributed transaction handling
 
-Designing compensations
+Failure recovery mechanisms
 
-Building fault-tolerant systems
+Production-grade microservices design
 
-Production-grade microservices
+📈 Future Enhancements
+Saga State Store (Redis / DB)
+
+Exactly-Once Semantics
+
+Kafka Streams
+
+OpenTelemetry Tracing
+
+Kubernetes Deployment
+
+Circuit Breakers
+
+👩‍💻 Author
+Deepana Balmoor
+Associate Software Engineer | Java Backend Developer
