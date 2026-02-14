@@ -7,41 +7,30 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="common-dto" />
         <module name="gateway-service" />
       </profile>
-      <profile name="Gradle Imported" enabled="true">
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.42/8365263844ebb62398e0dc33057ba10ba472d3b8/lombok-1.18.42.jar" />
-        </processorPath>
-        <module name="saga-orchestration.main" />
-      </profile>
-      <profile name="Annotation profile for saga-orchestrator" enabled="true">
+      <profile name="Annotation profile for order-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
         </processorPath>
+        <module name="order-service" />
         <module name="payment-service" />
         <module name="inventory-service" />
-        <module name="order-service" />
         <module name="saga-orchestrator" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="saga-orchestration" target="17" />
-    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="common-dto" options="" />
       <module name="gateway-service" options="-parameters" />
       <module name="inventory-service" options="-parameters" />
       <module name="order-service" options="-parameters" />
       <module name="payment-service" options="-parameters" />
-      <module name="saga-orchestration" options="-parameters" />
-      <module name="saga-orchestration.main" options="-parameters" />
-      <module name="saga-orchestration.test" options="-parameters" />
       <module name="saga-orchestrator" options="-parameters" />
     </option>
   </component>

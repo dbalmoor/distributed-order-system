@@ -1,7 +1,6 @@
 package com.deepana.orderservice.kafka;
 
-import com.deepana.orderservice.events.OrderCancelledEvent;
-import com.deepana.orderservice.events.OrderCreatedEvent;
+import com.deepana.saga.commondto.order.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,50 +12,43 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class OrderEventProducer {
 
+    // IMPORTANT: Object, not String
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper mapper;
+    private final ObjectMapper objectMapper;
+
 
     public void sendOrderCreated(OrderCreatedEvent event) {
 
         try {
-
-            String json = mapper.writeValueAsString(event);
+            String json = objectMapper.writeValueAsString(event);
 
             kafkaTemplate.send(
                     "order.created",
-                    event.getOrderNumber(),
+                    String.valueOf(event.getOrderId()),
                     json
             );
 
-            log.info("order.created sent {}", json);
+            log.info("order.created sent: {}", json);
 
         } catch (Exception e) {
-
-            log.error("Failed to send order.created", e);
             throw new RuntimeException(e);
         }
     }
 
 
-    public void sendOrderCancelled(OrderCancelledEvent event) {
+    public void sendOrderCancelled(CancelOrderCommand command) {
 
-        try {
-
-            String json = mapper.writeValueAsString(event);
-
+        try{
+            String json = objectMapper.writeValueAsString(command);
             kafkaTemplate.send(
-                    "order.cancelled",
-                    event.getOrderNumber(),
+                    "order.cancel.cmd",
+                    String.valueOf(command.getOrderId()),
                     json
             );
 
-            log.info("order.cancelled sent {}", json);
-
+            log.info("order.cancel.cmd sent: {}", command);
         } catch (Exception e) {
-
             throw new RuntimeException(e);
         }
     }
-
-
 }

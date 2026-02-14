@@ -2,15 +2,22 @@ package com.deepana.paymentservice.service;
 
 import com.deepana.paymentservice.common.logging.SagaLogger;
 import com.deepana.paymentservice.entity.Payment;
-import com.deepana.paymentservice.events.*;
 import com.deepana.paymentservice.kafka.PaymentEventProducer;
 import com.deepana.paymentservice.repository.PaymentRepository;
+import com.deepana.saga.commondto.base.BaseEvent;
+import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
+import com.deepana.saga.commondto.payment.PaymentFailedEvent;
+import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Random;
 
@@ -28,91 +35,118 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public void processPayment(InventoryReservedEvent event) {
 
-        // ✅ Saga Start Log
-        SagaLogger.success(
-                "PAYMENT",
-                event.getOrderNumber(),
-                "PAYMENT_STARTED"
-        );
+        try {
 
-        log.info(
-                "Payment started for order {} | Amount={}",
-                event.getOrderNumber(),
-                event.getAmount()
-        );
+            MDC.put("traceId", event.getTraceId());
 
-        // 80% success simulation
-        boolean success = random.nextInt(10) < 8;
-
-        // ✅ Create payment entity
-        Payment payment = new Payment();
-
-        payment.setOrderId(event.getOrderId());
-        payment.setOrderNumber(event.getOrderNumber());
-
-        // ✅ Use BigDecimal from event
-        BigDecimal amount = event.getAmount();
-
-        if (amount == null) {
-            amount = BigDecimal.ZERO;
-            log.warn("Amount is NULL for order {}", event.getOrderNumber());
-        }
-
-        payment.setAmount(amount);
-        payment.setCreatedAt(LocalDateTime.now());
-
-        if (success) {
-
-            // ✅ SUCCESS FLOW
-            payment.setStatus("SUCCESS");
-            repository.save(payment);
-
-            PaymentSuccessEvent successEvent = new PaymentSuccessEvent();
-            successEvent.setOrderId(event.getOrderId());
-            successEvent.setOrderNumber(event.getOrderNumber());
-            successEvent.setTraceId(event.getTraceId());
-
-            producer.sendSuccess(successEvent);
-
-            // ✅ Saga Log
             SagaLogger.success(
                     "PAYMENT",
                     event.getOrderNumber(),
-                    "PAYMENT_SUCCESS"
+                    "PAYMENT_STARTED"
             );
 
             log.info(
-                    "Payment SUCCESS for {} | Amount={}",
+                    "Payment started for order {} | Amount={}",
                     event.getOrderNumber(),
-                    amount
+                    event.getTotalAmount()
             );
 
-        } else {
+            // ✅ Persist payment record
+            Payment payment = new Payment();
 
-            // ❌ FAILURE FLOW
-            payment.setStatus("FAILED");
-            repository.save(payment);
+            if (event.getTotalAmount()
+                    .compareTo(new BigDecimal("10000")) == 0) {
 
-            PaymentFailedEvent failedEvent = new PaymentFailedEvent();
-            failedEvent.setOrderId(event.getOrderId());
-            failedEvent.setOrderNumber(event.getOrderNumber());
-            failedEvent.setReason("Payment gateway declined");
-            failedEvent.setTraceId(event.getTraceId());
+                payment.setStatus("FAILED");
+                repository.save(payment);
 
-            producer.sendFailed(failedEvent);
+                PaymentFailedEvent failedEvent = new PaymentFailedEvent();
 
-            // ❌ Saga Log
-            SagaLogger.failed(
-                    "PAYMENT",
-                    event.getOrderNumber(),
-                    "PAYMENT_FAILED"
-            );
+                failedEvent.setSagaId(event.getSagaId());
+                failedEvent.setOrderId(event.getOrderId());
+                failedEvent.setOrderNumber(event.getOrderNumber());
+                failedEvent.setTraceId(event.getTraceId());
+                failedEvent.setTimestamp(Instant.now());
+                failedEvent.setReason("Forced failure for testing");
 
-            log.warn(
-                    "Payment FAILED for {} | Amount={}",
-                    event.getOrderNumber(),
-                    amount
-            );
+
+                producer.sendFailed(failedEvent);
+
+                return;
+            }
+
+            // 80% success simulation
+            boolean success = random.nextInt(10) < 8;
+
+
+            payment.setOrderId(event.getOrderId());
+            payment.setOrderNumber(event.getOrderNumber());
+            payment.setAmount(event.getTotalAmount());
+            payment.setCreatedAt(LocalDateTime.now());
+
+            if (success) {
+
+                payment.setStatus("SUCCESS");
+                repository.save(payment);
+
+                PaymentSuccessEvent successEvent = new PaymentSuccessEvent();
+                copyBaseFields(event, successEvent);
+
+                successEvent.setTimestamp(Instant.now());
+
+                producer.sendSuccess(successEvent);
+
+                SagaLogger.success(
+                        "PAYMENT",
+                        event.getOrderNumber(),
+                        "PAYMENT_SUCCESS"
+                );
+
+                log.info(
+                        "Payment SUCCESS for {} | Amount={}",
+                        event.getOrderNumber(),
+                        event.getTotalAmount()
+                );
+
+            } else {
+
+                payment.setStatus("FAILED");
+                repository.save(payment);
+
+                PaymentFailedEvent failedEvent = new PaymentFailedEvent();
+                copyBaseFields(event, failedEvent);
+
+                failedEvent.setReason("Payment gateway declined");
+                failedEvent.setTimestamp(Instant.now());
+
+                producer.sendFailed(failedEvent);
+
+                SagaLogger.failed(
+                        "PAYMENT",
+                        event.getOrderNumber(),
+                        "PAYMENT_FAILED"
+                );
+
+                log.warn(
+                        "Payment FAILED for {} | Amount={}",
+                        event.getOrderNumber(),
+                        event.getTotalAmount()
+                );
+            }
+
+        } finally {
+            MDC.clear();
         }
+    }
+
+    // ============================================
+    // 🔁 Utility: Copy BaseEvent metadata
+    // ============================================
+
+    private void copyBaseFields(BaseEvent source, BaseEvent target) {
+        target.setSagaId(source.getSagaId());
+        target.setOrderId(source.getOrderId());
+        target.setOrderNumber(source.getOrderNumber());
+        target.setTraceId(source.getTraceId());
     }
 }

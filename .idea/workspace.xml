@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="47300821-19c1-44ea-8d37-62da6b81581a" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/base/BaseEvent.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/order/OrderCreatedEvent.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/RefundPaymentCommand.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/config/KafkaConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/config/KafkaConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/config/KafkaConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/config/KafkaErrorConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/dto/commands/ReleaseInventoryCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/ReleaseInventoryCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/dto/commands/ReserveInventoryCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/ReserveInventoryCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/dto/events/InventoryFailedEvent.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/dto/events/InventoryReservedEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/ChargePaymentCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/dto/events/OrderCreatedEvent.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/dto/events/OrderItemEvent.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/kafka/InventoryEventProducer.java" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/kafka/InventoryEventProducer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/kafka/OrderEventConsumer.java" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/kafka/InventoryCommandConsumer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryService.java" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/resources/application.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/resources/application.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/saga.2026-01-26.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/saga.2026-01-28.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/saga.2026-01-29.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/saga.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/saga.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/commands/CancelOrderCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/order/CancelOrderCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/commands/ConfirmOrderCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/order/ConfirmOrderCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/config/JacksonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/config/JacksonConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/config/KafkaConsumerConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/config/KafkaProducerConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/controller/OrderController.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/controller/OrderController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/dto/request/OrderItemRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/dto/request/OrderItemRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/events/InventoryFailedEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/InventoryFailedEvent.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/events/InventoryReservedEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/InventoryReservedEvent.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/events/OrderCancelledEvent.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/events/OrderCreatedEvent.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/events/OrderItemEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/order/OrderItemEvent.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/events/PaymentFailedEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/PaymentFailedEvent.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/events/PaymentSuccessEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/PaymentSuccessEvent.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/InventoryEventConsumer.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/InventoryEventConsumer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/KafkaErrorConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/config/KafkaErrorConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/OrderCommandConsumer.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/OrderCommandConsumer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/OrderEventProducer.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/OrderEventProducer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/PaymentEventConsumer.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/PaymentEventConsumer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/listener/InventoryEventListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/listener/OrderDLQListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/kafka/OrderDLQListener.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/mapper/OrderMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/mapper/OrderMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/service/OrderService.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/service/OrderService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/service/OrderServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/service/OrderServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order-service/src/main/resources/application.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/order-service/src/main/resources/application.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/config/KafkaConsumerConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/config/KafkaProducerConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/events/InventoryReservedEvent.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/events/PaymentFailedEvent.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/events/PaymentSuccessEvent.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/kafka/InventoryEventConsumer.java" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/kafka/InventoryEventConsumer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/kafka/KafkaErrorConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/config/KafkaErrorConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/service/PaymentService.java" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/service/PaymentService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/service/PaymentServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/service/PaymentServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/resources/application.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/resources/application.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/SagaOrchestratorApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/SagaOrchestratorApplication.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/commands/ChargePaymentCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/commands/ChargePaymentCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/config/JacksonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/config/JacksonConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/config/KafkaProducerConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/kafka/SagaCommandProducer.java" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/kafka/SagaCommandProducer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/kafka/SagaEventConsumer.java" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/kafka/SagaEventConsumer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/service/SagaService.java" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/service/SagaService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/service/SagaServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/java/com/deepana/sagaorchestrator/service/SagaServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/saga-orchestrator/src/main/resources/application.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/saga-orchestrator/src/main/resources/application.yaml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MavenImportPreferences">
+    <option name="generalSettings">
+      <MavenGeneralSettings>
+        <option name="mavenHomeTypeForPersistence" value="WRAPPER" />
+      </MavenGeneralSettings>
+    </option>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 0
+}</component>
+  <component name="ProjectId" id="39QzaVJ1hAvyAt5NSJI4neCpHzP" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.InventoryService.executor": "Run",
+    "Application.OrderService.executor": "Run",
+    "Application.PaymentService.executor": "Run",
+    "Application.SagaOrchestrator.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "Spring Boot.CommonDtoApplication.executor": "Run",
+    "Spring Boot.OrderServiceApplication.executor": "Run",
+    "Spring Boot.SagaOrchestratorApplication.executor": "Run",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true"
+  }
+}]]></component>
+  <component name="RunManager" selected="Application.InventoryService">
+    <configuration name="InventoryService" type="Application" factoryName="Application">
+      <option name="ALTERNATIVE_JRE_PATH" value="17" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+      <option name="MAIN_CLASS_NAME" value="com.deepana.inventoryservice.InventoryServiceApplication" />
+      <module name="inventory-service" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="OrderService" type="Application" factoryName="Application">
+      <option name="ALTERNATIVE_JRE_PATH" value="17" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+      <option name="MAIN_CLASS_NAME" value="com.deepana.orderservice.OrderServiceApplication" />
+      <module name="order-service" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="PaymentService" type="Application" factoryName="Application">
+      <option name="ALTERNATIVE_JRE_PATH" value="17" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+      <option name="MAIN_CLASS_NAME" value="com.deepana.paymentservice.PaymentServiceApplication" />
+      <module name="payment-service" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="SagaOrchestrator" type="Application" factoryName="Application">
+      <option name="ALTERNATIVE_JRE_PATH" value="17" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+      <option name="MAIN_CLASS_NAME" value="com.deepana.sagaorchestrator.SagaOrchestratorApplication" />
+      <module name="saga-orchestrator" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Application.OrderService" />
+      <item itemvalue="Application.SagaOrchestrator" />
+      <item itemvalue="Application.PaymentService" />
+      <item itemvalue="Application.InventoryService" />
+    </list>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.30387.90" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="47300821-19c1-44ea-8d37-62da6b81581a" name="Changes" comment="" />
+      <created>1770643147849</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1770643147849</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

@@ -1,7 +1,7 @@
 package com.deepana.paymentservice.kafka;
 
-import com.deepana.paymentservice.events.InventoryReservedEvent;
 import com.deepana.paymentservice.service.PaymentService;
+import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -19,14 +19,12 @@ public class InventoryEventConsumer {
     private final ObjectMapper objectMapper;
 
     @KafkaListener(
-            topics = "inventory.reserved",
+            topics = "payment.charge.cmd",
             groupId = "payment-group"
     )
     public void consume(String message) throws JsonProcessingException {
 
         try {
-
-
 
             InventoryReservedEvent event =
                     objectMapper.readValue(message, InventoryReservedEvent.class);

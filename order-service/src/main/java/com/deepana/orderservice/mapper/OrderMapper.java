@@ -7,19 +7,21 @@ import com.deepana.orderservice.entity.Order;
 import com.deepana.orderservice.entity.OrderItem;
 import com.deepana.orderservice.entity.OrderStatus;
 
-import com.deepana.orderservice.events.OrderCreatedEvent;
-import com.deepana.orderservice.events.OrderItemEvent;
-import org.jspecify.annotations.NonNull;
-import org.slf4j.MDC;
+import com.deepana.saga.commondto.order.OrderCreatedEvent;
+import com.deepana.saga.commondto.order.OrderItemEvent;
+
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
 public class OrderMapper {
+
+    // ================= ENTITY =================
 
     public Order toEntity(CreateOrderRequestDTO dto) {
 
@@ -62,6 +64,8 @@ public class OrderMapper {
         return order;
     }
 
+    // ================= RESPONSE =================
+
     public OrderResponseDTO toResponse(Order order) {
 
         List<OrderItemResponseDTO> items =
@@ -81,10 +85,13 @@ public class OrderMapper {
                         })
                         .collect(Collectors.toList());
 
-        return getOrderResponseDTO(order, items);
+        return buildResponse(order, items);
     }
 
-    private static @NonNull OrderResponseDTO getOrderResponseDTO(Order order, List<OrderItemResponseDTO> items) {
+    private OrderResponseDTO buildResponse(
+            Order order,
+            List<OrderItemResponseDTO> items) {
+
         OrderResponseDTO response = new OrderResponseDTO();
 
         response.setId(order.getId());
@@ -97,8 +104,46 @@ public class OrderMapper {
         response.setItems(items);
         response.setCreatedAt(order.getCreatedAt());
         response.setUpdatedAt(order.getUpdatedAt());
+
         return response;
     }
+
+    // ================= SAGA EVENT =================
+
+    public OrderCreatedEvent toSagaEvent(
+            Order order,
+            String sagaId,
+            String traceId) {
+
+        List<OrderItemEvent> items = order.getItems()
+                .stream()
+                .map(i -> new OrderItemEvent(
+                        i.getProductId(),
+                        i.getQuantity(),
+                        i.getPrice()
+                ))
+                .toList();
+
+        OrderCreatedEvent event = new OrderCreatedEvent();
+
+        // BaseEvent fields
+        event.setSagaId(sagaId);
+        event.setOrderId(order.getId());
+        event.setTraceId(traceId);
+        event.setTimestamp(Instant.now());
+        event.setOrderNumber(order.getOrderNumber());
+
+
+        // Business fields
+        event.setUserId(order.getUserId());
+        event.setTotalAmount(order.getTotalAmount());
+        event.setItems(items);
+        event.setCreatedAt(Instant.now());
+
+        return event;
+    }
+
+    // ================= UTIL =================
 
     private String generateOrderNumber() {
 
@@ -107,34 +152,4 @@ public class OrderMapper {
                 .substring(0, 8)
                 .toUpperCase();
     }
-
-    public OrderCreatedEvent mapToEvent(Order order) {
-
-        List<OrderItemEvent> items = order.getItems().stream()
-                .map(i -> new OrderItemEvent(
-                        i.getProductId(),
-                        i.getQuantity(),
-                        i.getPrice()
-                ))
-                .toList();
-
-        // ✅ Get traceId from MDC (or fallback)
-        String traceId = MDC.get("traceId");
-
-        if (traceId == null) {
-            traceId = order.getOrderNumber(); // fallback safety
-        }
-
-        return new OrderCreatedEvent(
-                order.getId(),
-                order.getOrderNumber(),
-                order.getUserId(),
-                order.getTotalAmount(),
-                items,
-                order.getCreatedAt(),
-                traceId // ✅ pass it
-        );
-    }
-
-
 }

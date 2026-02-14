@@ -1,11 +1,14 @@
 package com.deepana.orderservice.kafka;
 
-import com.deepana.orderservice.events.InventoryFailedEvent;
-import com.deepana.orderservice.events.InventoryReservedEvent;
 import com.deepana.orderservice.service.OrderService;
+import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
+import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -18,53 +21,57 @@ public class InventoryEventConsumer {
     private final OrderService orderService;
     private final ObjectMapper objectMapper;
 
+    // ================= RESERVED =================
+
     @KafkaListener(
             topics = "inventory.reserved",
             groupId = "order-group"
     )
-    public void handleReserved(String message) {
+    public void handleReserved(String message) throws JsonProcessingException {
 
         try {
-
-            InventoryReservedEvent event =
-                    objectMapper.readValue(message, InventoryReservedEvent.class);
+            InventoryReservedEvent event = objectMapper.readValue(message, InventoryReservedEvent.class);
 
             MDC.put("traceId", event.getTraceId());
 
-            log.info("Received inventory.reserved {}", message);
+            log.info("Received inventory.reserved: {}", event);
 
             orderService.handleInventoryReserved(event);
 
         } catch (Exception e) {
 
             log.error("Failed to process inventory.reserved", e);
-        } finally {
+            throw e;
 
-            MDC.clear(); // important
+        } finally {
+            MDC.clear();
         }
     }
+
+    // ================= FAILED =================
 
     @KafkaListener(
             topics = "inventory.failed",
             groupId = "order-group"
     )
-    public void handleFailed(String message) {
+    public void handleFailed(String message) throws JsonProcessingException {
 
         try {
-
-            InventoryFailedEvent event =
-                    objectMapper.readValue(message, InventoryFailedEvent.class);
+            InventoryFailedEvent event = objectMapper.readValue(message, InventoryFailedEvent.class);
 
             MDC.put("traceId", event.getTraceId());
 
-            log.info("Received inventory.failed {}", message);
+            log.info("Received inventory.failed: {}", event);
 
             orderService.handleInventoryFailed(event);
 
         } catch (Exception e) {
 
             log.error("Failed to process inventory.failed", e);
+            throw e;
+
+        } finally {
+            MDC.clear();
         }
     }
-
 }

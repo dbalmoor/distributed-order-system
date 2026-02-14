@@ -1,0 +1,34 @@
+Starting OrderServiceApplication using Java 17.0.12 with PID 22948 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 24948 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 26332 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 20976 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 3.677 seconds (process running for 3.906)
+Starting OrderServiceApplication using Java 17.0.12 with PID 17536 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 4.22 seconds (process running for 4.463)
+Starting OrderServiceApplication using Java 17.0.12 with PID 6376 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 3.646 seconds (process running for 3.88)
+order.created sent: OrderCreatedEvent(userId=123, totalAmount=10, items=[OrderItemEvent(productId=2, quantity=1)], createdAt=2026-02-09T14:43:22.253985800Z)
+Order created and saga started 92
+Starting OrderServiceApplication using Java 17.0.12 with PID 3052 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 3.727 seconds (process running for 3.984)
+Starting OrderServiceApplication using Java 17.0.12 with PID 23432 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 21016 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 3.891 seconds (process running for 4.125)
+Starting OrderServiceApplication using Java 17.0.12 with PID 27444 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 8.471 seconds (process running for 9.029)
+order.created sent: OrderCreatedEvent(userId=123, totalAmount=10, items=[OrderItemEvent(productId=2, quantity=1)], createdAt=2026-02-09T16:38:57.343526200Z)
+Order created and saga started 93
+order.created sent: OrderCreatedEvent(userId=123, totalAmount=10, items=[OrderItemEvent(productId=2, quantity=1)], createdAt=2026-02-09T16:43:53.094524800Z)
+Order created and saga started 94
+order.created sent: OrderCreatedEvent(userId=123, totalAmount=10, items=[OrderItemEvent(productId=1, quantity=1)], createdAt=2026-02-09T16:45:48.448491100Z)
+Order created and saga started 95

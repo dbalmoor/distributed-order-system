@@ -1,56 +1,440 @@
-Starting OrderServiceApplication using Java 17.0.12 with PID 28860 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+Starting OrderServiceApplication using Java 17.0.12 with PID 6868 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
 No active profile set, falling back to 1 default profile: "default"
-Starting InventoryServiceApplication using Java 17.0.12 with PID 33472 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+Starting OrderServiceApplication using Java 17.0.12 with PID 8844 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
 No active profile set, falling back to 1 default profile: "default"
-Starting InventoryServiceApplication using Java 17.0.12 with PID 32420 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+Starting OrderServiceApplication using Java 17.0.12 with PID 8908 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
 No active profile set, falling back to 1 default profile: "default"
-Starting OrderServiceApplication using Java 17.0.12 with PID 31816 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+Starting OrderServiceApplication using Java 17.0.12 with PID 16608 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
 No active profile set, falling back to 1 default profile: "default"
-Started InventoryServiceApplication in 8.015 seconds (process running for 8.597)
-Started OrderServiceApplication in 8.611 seconds (process running for 9.175)
-Starting PaymentServiceApplication using Java 17.0.12 with PID 16356 (F:\PROJECTS\git\distributed-order-system\payment-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+Starting OrderServiceApplication using Java 17.0.12 with PID 12112 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
 No active profile set, falling back to 1 default profile: "default"
-Started PaymentServiceApplication in 8.104 seconds (process running for 8.709)
-Order event sent: {"orderId":90,"orderNumber":"ORD-e691d106","userId":135,"totalAmount":10000,"items":[{"productId":2,"quantity":1,"price":10000}],"createdAt":"2026-02-08T11:50:05.0720154","traceId":"ORD-e691d106"}
-[SAGA] [SERVICE:ORDER] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:ORDER_CREATED] [STATUS:SUCCESS] at 2026-02-08T11:50:05.387357200
-Received order: ORD-e691d106
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:RECEIVED_ORDER] [STATUS:SUCCESS] at 2026-02-08T11:50:05.715536600
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-08T11:50:05.716547200
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:FOUND_PRODUCT_2] [STATUS:SUCCESS] at 2026-02-08T11:50:06.614364200
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:RESERVED_PRODUCT_2] [STATUS:SUCCESS] at 2026-02-08T11:50:06.674353400
-Inventory reserved event sent: {"orderNumber":"ORD-e691d106","orderId":90,"amount":10000,"traceId":"ORD-e691d106"}
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-08T11:50:06.782558600
-Received inventory.reserved {"orderNumber":"ORD-e691d106","orderId":90,"amount":10000,"traceId":"ORD-e691d106"}
-Received inventory.reserved {"orderNumber":"ORD-e691d106","orderId":90,"amount":10000,"traceId":"ORD-e691d106"}
-[SAGA] [SERVICE:ORDER] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:INVENTORY_RESERVED] [STATUS:SUCCESS] at 2026-02-08T11:50:06.936068600
-Inventory reserved ORD-e691d106
-[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-08T11:50:06.952044700
+Starting OrderServiceApplication using Java 17.0.12 with PID 21280 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 20624 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 10.816 seconds (process running for 11.447)
+Starting OrderServiceApplication using Java 17.0.12 with PID 26260 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 11.13 seconds (process running for 11.787)
+Starting InventoryServiceApplication using Java 17.0.12 with PID 12528 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started InventoryServiceApplication in 10.019 seconds (process running for 10.637)
+order.created sent: {"sagaId":"ca902d65-c9b3-464e-a5c0-089545a71b62","orderId":96,"traceId":"ORD-8b09030f","timestamp":"2026-02-14T06:09:33.510899200Z","userId":123,"orderNumber":null,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T06:09:33.510899200Z"}
+Order created and saga started 96
+Starting InventoryServiceApplication using Java 17.0.12 with PID 27228 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 11452 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started InventoryServiceApplication in 11.474 seconds (process running for 12.232)
+Started OrderServiceApplication in 11.597 seconds (process running for 12.31)
+order.created sent: {"sagaId":"73ddd5eb-a241-4e1c-b142-576e8332dd09","orderId":97,"traceId":"ORD-c046f37d","timestamp":"2026-02-14T06:20:35.963422600Z","orderNumber":null,"userId":123,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T06:20:35.963422600Z"}
+Order created and saga started 97
+order.created sent: {"sagaId":"b44817a3-4856-46c8-abb1-44cf6dbae4ab","orderId":98,"traceId":"ORD-f8dc1ec8","timestamp":"2026-02-14T06:23:39.797183400Z","orderNumber":null,"userId":123,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T06:23:39.797183400Z"}
+Order created and saga started 98
+Received inventory.reserve.cmd: 98
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-f8dc1ec8] [ORDER:98] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T11:53:40.287866200
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-f8dc1ec8] [ORDER:98] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T11:53:40.826809800
+Inventory Event Sent [inventory.failed] => {"sagaId":null,"orderId":98,"traceId":"ORD-f8dc1ec8","timestamp":null,"orderNumber":null,"reason":"Cannot invoke \"java.util.List.iterator()\" because the return value of \"com.deepana.saga.commondto.inventory.ReserveInventoryCommand.getItems()\" is null"}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-f8dc1ec8] [ORDER:98] [STEP:FAILED_EVENT_PUBLISHED] [STATUS:FAILED] at 2026-02-14T11:53:40.921710300
+Inventory FAILED for order 98 : Cannot invoke "java.util.List.iterator()" because the return value of "com.deepana.saga.commondto.inventory.ReserveInventoryCommand.getItems()" is null
+Received inventory.failed: InventoryFailedEvent(reason=Cannot invoke "java.util.List.iterator()" because the return value of "com.deepana.saga.commondto.inventory.ReserveInventoryCommand.getItems()" is null)
+Received order.cancel.cmd: CancelOrderCommand(reason=ORD-f8dc1ec8)
+Order cancelled by saga 98
+Inventory failed for order 98
+order.created sent: {"sagaId":"7c24b87b-bb3a-457e-93b2-8fb2ee6d83ee","orderId":99,"traceId":"ORD-50008948","timestamp":"2026-02-14T06:30:24.949380600Z","orderNumber":null,"userId":123,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T06:30:24.949380600Z"}
+Order created and saga started 99
+Received inventory.reserve.cmd: 99
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-50008948] [ORDER:99] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T12:00:25.264277400
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-50008948] [ORDER:99] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T12:00:25.273139500
+Inventory Event Sent [inventory.failed] => {"sagaId":null,"orderId":99,"traceId":"ORD-50008948","timestamp":null,"orderNumber":null,"reason":"Cannot invoke \"java.util.List.iterator()\" because the return value of \"com.deepana.saga.commondto.inventory.ReserveInventoryCommand.getItems()\" is null"}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-50008948] [ORDER:99] [STEP:FAILED_EVENT_PUBLISHED] [STATUS:FAILED] at 2026-02-14T12:00:25.280569300
+Inventory FAILED for order 99 : Cannot invoke "java.util.List.iterator()" because the return value of "com.deepana.saga.commondto.inventory.ReserveInventoryCommand.getItems()" is null
+Received inventory.failed: InventoryFailedEvent(reason=Cannot invoke "java.util.List.iterator()" because the return value of "com.deepana.saga.commondto.inventory.ReserveInventoryCommand.getItems()" is null)
+Inventory failed for order 99
+Received order.cancel.cmd: CancelOrderCommand(reason=ORD-50008948)
+Starting OrderServiceApplication using Java 17.0.12 with PID 7156 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting InventoryServiceApplication using Java 17.0.12 with PID 2044 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 11.752 seconds (process running for 12.417)
+Started InventoryServiceApplication in 10.588 seconds (process running for 11.182)
+order.created sent: {"sagaId":"c4276e77-af3c-44e3-8557-f88d0acdc920","orderId":100,"traceId":"ORD-89c30b4a","timestamp":"2026-02-14T06:50:23.628558900Z","orderNumber":"ORD-89c30b4a","userId":123,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T06:50:23.628558900Z"}
+Order created and saga started 100
+Received inventory.reserve.cmd: 100
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-89c30b4a] [ORDER:100] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T12:20:24.190315600
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-89c30b4a] [ORDER:100] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T12:20:24.922569200
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-89c30b4a] [ORDER:100] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T12:20:25.279766700
+Inventory Event Sent [inventory.reserved] => {"sagaId":null,"orderId":100,"traceId":"ORD-89c30b4a","timestamp":null,"orderNumber":null,"totalAmount":10}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-89c30b4a] [ORDER:100] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T12:20:25.398627100
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10)
+Inventory reserved for order 100
+order.created sent: {"sagaId":"f7a3b027-83d1-47c9-aca8-0d219c9f8b86","orderId":101,"traceId":"ORD-7c086a54","timestamp":"2026-02-14T07:51:54.152664400Z","orderNumber":"ORD-7c086a54","userId":123,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T07:51:54.152664400Z"}
+Order created and saga started 101
+Received inventory.reserve.cmd: 101
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-7c086a54] [ORDER:101] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T13:21:54.198580300
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-7c086a54] [ORDER:101] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T13:21:54.206145300
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-7c086a54] [ORDER:101] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T13:21:54.212032400
+Inventory Event Sent [inventory.reserved] => {"sagaId":null,"orderId":101,"traceId":"ORD-7c086a54","timestamp":null,"orderNumber":null,"totalAmount":10}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-7c086a54] [ORDER:101] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T13:21:54.224680800
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10)
+Inventory reserved for order 101
+Starting InventoryServiceApplication using Java 17.0.12 with PID 19756 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 11532 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started InventoryServiceApplication in 7.359 seconds (process running for 7.672)
+Started OrderServiceApplication in 7.981 seconds (process running for 8.418)
+order.created sent: {"sagaId":"117e4154-0ff1-4d92-84ef-235987d34b1b","orderId":102,"traceId":"ORD-e76accf0","timestamp":"2026-02-14T08:01:08.596182900Z","orderNumber":"ORD-e76accf0","userId":123,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T08:01:08.596182900Z"}
+Order created and saga started 102
+Received inventory.reserve.cmd: 102
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e76accf0] [ORDER:102] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T13:31:08.994393300
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e76accf0] [ORDER:102] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T13:31:09.380052
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e76accf0] [ORDER:102] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T13:31:09.534071400
+Inventory Event Sent [inventory.reserved] => {"sagaId":"117e4154-0ff1-4d92-84ef-235987d34b1b","orderId":102,"traceId":"ORD-e76accf0","timestamp":1771056068.596182900,"orderNumber":"ORD-e76accf0","totalAmount":10}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e76accf0] [ORDER:102] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T13:31:09.605150
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10)
+Inventory reserved for order 102
+Starting PaymentServiceApplication using Java 17.0.12 with PID 22452 (F:\PROJECTS\git\distributed-order-system\payment-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started PaymentServiceApplication in 5.044 seconds (process running for 5.36)
+Received inventory.reserved {"orderId":90,"orderNumber":"ORD-e691d106","totalAmount":10000,"traceId":"ORD-e691d106"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T13:57:05.317330200
 Payment started for order ORD-e691d106 | Amount=10000
-Payment failed sent: {"orderId":90,"orderNumber":"ORD-e691d106","reason":"Payment gateway declined","traceId":"ORD-e691d106"}
-[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:PAYMENT_FAILED] [STATUS:FAILED] at 2026-02-08T11:50:07.094585800
-Payment FAILED for ORD-e691d106 | Amount=10000
-Received payment.failed {"orderId":90,"orderNumber":"ORD-e691d106","reason":"Payment gateway declined","traceId":"ORD-e691d106"}
-[SAGA] [SERVICE:ORDER] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:PAYMENT_FAILED] [STATUS:FAILED] at 2026-02-08T11:50:07.134423
-Order event sent: {"orderId":91,"orderNumber":"ORD-a0c58aff","userId":123,"totalAmount":10,"items":[{"productId":2,"quantity":1,"price":10}],"createdAt":"2026-02-08T11:50:21.9989525","traceId":"ORD-a0c58aff"}
-[SAGA] [SERVICE:ORDER] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:ORDER_CREATED] [STATUS:SUCCESS] at 2026-02-08T11:50:22.006855
-Received order: ORD-a0c58aff
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:RECEIVED_ORDER] [STATUS:SUCCESS] at 2026-02-08T11:50:22.025789900
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-08T11:50:22.026306300
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:FOUND_PRODUCT_2] [STATUS:SUCCESS] at 2026-02-08T11:50:22.034981800
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:RESERVED_PRODUCT_2] [STATUS:SUCCESS] at 2026-02-08T11:50:22.042613300
-Inventory reserved event sent: {"orderNumber":"ORD-a0c58aff","orderId":91,"amount":10,"traceId":"ORD-a0c58aff"}
-[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-08T11:50:22.044843300
-Received inventory.reserved: {"orderNumber":"ORD-a0c58aff","orderId":91,"amount":10,"traceId":"ORD-a0c58aff"}
-Received inventory.reserved {"orderNumber":"ORD-a0c58aff","orderId":91,"amount":10,"traceId":"ORD-a0c58aff"}
-[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-08T11:50:22.072305300
+Payment success sent: {"sagaId":null,"orderId":90,"traceId":"ORD-e691d106","timestamp":1771057625.369794000,"orderNumber":"ORD-e691d106"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T13:57:05.453908700
+Payment SUCCESS for ORD-e691d106 | Amount=10000
+Received inventory.reserved {"orderId":91,"orderNumber":"ORD-a0c58aff","totalAmount":10,"traceId":"ORD-a0c58aff"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T13:57:05.474184400
 Payment started for order ORD-a0c58aff | Amount=10
-Payment failed sent: {"orderId":91,"orderNumber":"ORD-a0c58aff","reason":"Payment gateway declined","traceId":"ORD-a0c58aff"}
-[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:PAYMENT_FAILED] [STATUS:FAILED] at 2026-02-08T11:50:22.078280900
-Payment FAILED for ORD-a0c58aff | Amount=10
-Received payment.failed {"orderId":91,"orderNumber":"ORD-a0c58aff","reason":"Payment gateway declined","traceId":"ORD-a0c58aff"}
-Payment failed pending ORD-a0c58aff
-Order ORD-a0c58aff CONFIRMED
-[SAGA] [SERVICE:ORDER] [TRACE:null] [ORDER:ORD-a0c58aff] [STEP:INVENTORY_RESERVED] [STATUS:SUCCESS] at 2026-02-08T11:50:22.114876400
-Starting OrderServiceApplication using Java 17.0.12 with PID 27296 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+Received payment.success: PaymentSuccessEvent()
+Payment success sent: {"sagaId":null,"orderId":91,"traceId":"ORD-a0c58aff","timestamp":1771057625.482437800,"orderNumber":"ORD-a0c58aff"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T13:57:05.483789300
+Payment SUCCESS for ORD-a0c58aff | Amount=10
+Received inventory.reserved {"sagaId":"117e4154-0ff1-4d92-84ef-235987d34b1b","orderId":102,"traceId":"ORD-e76accf0","timestamp":"2026-02-14T08:01:08.596182900Z","orderNumber":"ORD-e76accf0","totalAmount":10}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e76accf0] [ORDER:ORD-e76accf0] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T13:57:05.488754600
+Payment started for order ORD-e76accf0 | Amount=10
+Payment success sent: {"sagaId":"117e4154-0ff1-4d92-84ef-235987d34b1b","orderId":102,"traceId":"ORD-e76accf0","timestamp":1771057625.492648900,"orderNumber":"ORD-e76accf0"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e76accf0] [ORDER:ORD-e76accf0] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T13:57:05.493257600
+Payment SUCCESS for ORD-e76accf0 | Amount=10
+Received inventory.reserved {"sagaId":null,"orderId":100,"traceId":"ORD-89c30b4a","timestamp":null,"orderNumber":null,"totalAmount":10}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-89c30b4a] [ORDER:ORD-89c30b4a] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T13:57:05.495147200
+Payment started for order null | Amount=10
+Received order.confirm.cmd: ConfirmOrderCommand()
+Payment success sent: {"sagaId":null,"orderId":100,"traceId":"ORD-89c30b4a","timestamp":1771057625.501592400,"orderNumber":null}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-89c30b4a] [ORDER:ORD-89c30b4a] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T13:57:05.503597800
+Payment SUCCESS for null | Amount=10
+Received inventory.reserved {"sagaId":null,"orderId":101,"traceId":"ORD-7c086a54","timestamp":null,"orderNumber":null,"totalAmount":10}
+Order confirmed 90
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-7c086a54] [ORDER:ORD-7c086a54] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T13:57:05.505241100
+Payment started for order null | Amount=10
+Received payment.success: PaymentSuccessEvent()
+Payment success sent: {"sagaId":null,"orderId":101,"traceId":"ORD-7c086a54","timestamp":1771057625.508398500,"orderNumber":null}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-7c086a54] [ORDER:ORD-7c086a54] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T13:57:05.509010800
+Payment SUCCESS for null | Amount=10
+Payment success, order completed 91
+Received payment.success: PaymentSuccessEvent()
+Payment success, order completed 102
+Received order.confirm.cmd: ConfirmOrderCommand()
+Received order.confirm.cmd: ConfirmOrderCommand()
+Received payment.success: PaymentSuccessEvent()
+Payment success, order completed 100
+Received payment.success: PaymentSuccessEvent()
+Payment success, order completed 101
+Received order.confirm.cmd: ConfirmOrderCommand()
+Received order.confirm.cmd: ConfirmOrderCommand()
+order.created sent: {"sagaId":"05d8e170-94a9-4ed2-b427-5d0a4b90c308","orderId":103,"traceId":"ORD-666ad79e","timestamp":"2026-02-14T08:31:04.501609400Z","orderNumber":"ORD-666ad79e","userId":123,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T08:31:04.501609400Z"}
+Order created and saga started 103
+Received inventory.reserve.cmd: 103
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-666ad79e] [ORDER:103] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T14:01:04.559886500
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-666ad79e] [ORDER:103] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T14:01:04.567357500
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-666ad79e] [ORDER:103] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T14:01:04.575479800
+Inventory Event Sent [inventory.reserved] => {"sagaId":"05d8e170-94a9-4ed2-b427-5d0a4b90c308","orderId":103,"traceId":"ORD-666ad79e","timestamp":1771057864.501609400,"orderNumber":"ORD-666ad79e","totalAmount":10}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-666ad79e] [ORDER:103] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T14:01:04.585418500
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10)
+Inventory reserved for order 103
+Received inventory.reserved {"sagaId":"05d8e170-94a9-4ed2-b427-5d0a4b90c308","orderId":103,"traceId":"ORD-666ad79e","timestamp":"2026-02-14T08:31:04.501609400Z","orderNumber":"ORD-666ad79e","totalAmount":10}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-666ad79e] [ORDER:ORD-666ad79e] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T14:01:04.624054100
+Payment started for order ORD-666ad79e | Amount=10
+Payment success sent: {"sagaId":"05d8e170-94a9-4ed2-b427-5d0a4b90c308","orderId":103,"traceId":"ORD-666ad79e","timestamp":1771057864.627052900,"orderNumber":"ORD-666ad79e"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-666ad79e] [ORDER:ORD-666ad79e] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T14:01:04.628052500
+Payment SUCCESS for ORD-666ad79e | Amount=10
+Received payment.success: PaymentSuccessEvent()
+Payment success, order completed 103
+Received order.confirm.cmd: ConfirmOrderCommand()
+order.created sent: {"sagaId":"10f0b6ff-778c-4bcc-8759-846e63462343","orderId":104,"traceId":"ORD-464776c6","timestamp":"2026-02-14T08:36:03.665198100Z","orderNumber":"ORD-464776c6","userId":123,"totalAmount":1000000,"items":[{"productId":1,"quantity":100000,"price":10}],"createdAt":"2026-02-14T08:36:03.665198100Z"}
+Order created and saga started 104
+Received inventory.reserve.cmd: 104
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-464776c6] [ORDER:104] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T14:06:03.693508200
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-464776c6] [ORDER:104] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T14:06:03.698515600
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-464776c6] [ORDER:104] [STEP:INSUFFICIENT_STOCK_PRODUCT_1] [STATUS:FAILED] at 2026-02-14T14:06:03.702020600
+Inventory Event Sent [inventory.failed] => {"sagaId":"10f0b6ff-778c-4bcc-8759-846e63462343","orderId":104,"traceId":"ORD-464776c6","timestamp":1771058163.665198100,"orderNumber":"ORD-464776c6","reason":"Insufficient stock"}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-464776c6] [ORDER:104] [STEP:FAILED_EVENT_PUBLISHED] [STATUS:FAILED] at 2026-02-14T14:06:03.709581
+Inventory FAILED for order 104 : Insufficient stock
+Received inventory.failed: InventoryFailedEvent(reason=Insufficient stock)
+Inventory failed for order 104
+Received order.cancel.cmd: CancelOrderCommand(reason=INVENTORY_FAILED)
+Starting PaymentServiceApplication using Java 17.0.12 with PID 9588 (F:\PROJECTS\git\distributed-order-system\payment-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
 No active profile set, falling back to 1 default profile: "default"
-Started OrderServiceApplication in 8.249 seconds (process running for 8.568)
+Started PaymentServiceApplication in 4.862 seconds (process running for 5.178)
+order.created sent: {"sagaId":"84ef8b17-b80a-426e-8fe9-64f7adbdcadc","orderId":105,"traceId":"ORD-281f1eca","timestamp":"2026-02-14T08:49:17.534774600Z","orderNumber":"ORD-281f1eca","userId":123,"totalAmount":1000000,"items":[{"productId":1,"quantity":100000,"price":10}],"createdAt":"2026-02-14T08:49:17.534774600Z"}
+Order created and saga started 105
+Received inventory.reserve.cmd: 105
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-281f1eca] [ORDER:105] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T14:19:17.573061
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-281f1eca] [ORDER:105] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T14:19:17.580946
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-281f1eca] [ORDER:105] [STEP:INSUFFICIENT_STOCK_PRODUCT_1] [STATUS:FAILED] at 2026-02-14T14:19:17.584749500
+Inventory Event Sent [inventory.failed] => {"sagaId":"84ef8b17-b80a-426e-8fe9-64f7adbdcadc","orderId":105,"traceId":"ORD-281f1eca","timestamp":1771058957.534774600,"orderNumber":"ORD-281f1eca","reason":"Insufficient stock"}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-281f1eca] [ORDER:105] [STEP:FAILED_EVENT_PUBLISHED] [STATUS:FAILED] at 2026-02-14T14:19:17.598584600
+Inventory FAILED for order 105 : Insufficient stock
+Received inventory.failed: InventoryFailedEvent(reason=Insufficient stock)
+Inventory failed for order 105
+Received order.cancel.cmd: CancelOrderCommand(reason=INVENTORY_FAILED)
+order.created sent: {"sagaId":"aac2d794-045e-4ebb-a98d-11759fe68398","orderId":106,"traceId":"ORD-72480197","timestamp":"2026-02-14T08:49:38.003312700Z","orderNumber":"ORD-72480197","userId":123,"totalAmount":10,"items":[{"productId":1,"quantity":1,"price":10}],"createdAt":"2026-02-14T08:49:38.003312700Z"}
+Order created and saga started 106
+Received inventory.reserve.cmd: 106
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-72480197] [ORDER:106] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T14:19:38.036950700
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-72480197] [ORDER:106] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T14:19:38.039378700
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-72480197] [ORDER:106] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T14:19:38.045216400
+Inventory Event Sent [inventory.reserved] => {"sagaId":"aac2d794-045e-4ebb-a98d-11759fe68398","orderId":106,"traceId":"ORD-72480197","timestamp":1771058978.003312700,"orderNumber":"ORD-72480197","totalAmount":10}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-72480197] [ORDER:106] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T14:19:38.053167
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10)
+Inventory reserved for order 106
+Received inventory.reserved {"sagaId":"aac2d794-045e-4ebb-a98d-11759fe68398","orderId":106,"traceId":"ORD-72480197","timestamp":"2026-02-14T08:49:38.003312700Z","orderNumber":"ORD-72480197","totalAmount":10}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-72480197] [ORDER:ORD-72480197] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T14:19:38.447406
+Payment started for order ORD-72480197 | Amount=10
+Payment success sent: {"sagaId":"aac2d794-045e-4ebb-a98d-11759fe68398","orderId":106,"traceId":"ORD-72480197","timestamp":1771058978.634368600,"orderNumber":"ORD-72480197"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-72480197] [ORDER:ORD-72480197] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T14:19:38.901894400
+Payment SUCCESS for ORD-72480197 | Amount=10
+Received payment.success: PaymentSuccessEvent()
+Payment success, order completed 106
+Received order.confirm.cmd: ConfirmOrderCommand()
+order.created sent: {"sagaId":"58edfb93-8fb0-4194-887c-8879cc9a159f","orderId":107,"traceId":"ORD-e6b9e880","timestamp":"2026-02-14T08:52:07.115620300Z","orderNumber":"ORD-e6b9e880","userId":123,"totalAmount":10000,"items":[{"productId":1,"quantity":1,"price":10000}],"createdAt":"2026-02-14T08:52:07.115620300Z"}
+Order created and saga started 107
+Received inventory.reserve.cmd: 107
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e6b9e880] [ORDER:107] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T14:22:07.161969500
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e6b9e880] [ORDER:107] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T14:22:07.168191400
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e6b9e880] [ORDER:107] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T14:22:07.181555400
+Inventory Event Sent [inventory.reserved] => {"sagaId":"58edfb93-8fb0-4194-887c-8879cc9a159f","orderId":107,"traceId":"ORD-e6b9e880","timestamp":1771059127.115620300,"orderNumber":"ORD-e6b9e880","totalAmount":10000}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e6b9e880] [ORDER:107] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T14:22:07.188284900
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10000)
+Inventory reserved for order 107
+Received inventory.reserved {"sagaId":"58edfb93-8fb0-4194-887c-8879cc9a159f","orderId":107,"traceId":"ORD-e6b9e880","timestamp":"2026-02-14T08:52:07.115620300Z","orderNumber":"ORD-e6b9e880","totalAmount":10000}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e6b9e880] [ORDER:ORD-e6b9e880] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T14:22:07.221629500
+Payment started for order ORD-e6b9e880 | Amount=10000
+Payment success sent: {"sagaId":"58edfb93-8fb0-4194-887c-8879cc9a159f","orderId":107,"traceId":"ORD-e6b9e880","timestamp":1771059127.223606800,"orderNumber":"ORD-e6b9e880"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e6b9e880] [ORDER:ORD-e6b9e880] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T14:22:07.225608600
+Payment SUCCESS for ORD-e6b9e880 | Amount=10000
+Received payment.success: PaymentSuccessEvent()
+Payment success, order completed 107
+Received order.confirm.cmd: ConfirmOrderCommand()
+order.created sent: {"sagaId":"32f63eff-1ebc-498e-9b02-ec5471e0e88f","orderId":108,"traceId":"ORD-8575b026","timestamp":"2026-02-14T08:53:24.984885300Z","orderNumber":"ORD-8575b026","userId":123,"totalAmount":10000,"items":[{"productId":1,"quantity":1,"price":10000}],"createdAt":"2026-02-14T08:53:24.984885300Z"}
+Order created and saga started 108
+Received inventory.reserve.cmd: 108
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-8575b026] [ORDER:108] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T14:23:25.022443800
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-8575b026] [ORDER:108] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T14:23:25.027037600
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-8575b026] [ORDER:108] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T14:23:25.039396300
+Inventory Event Sent [inventory.reserved] => {"sagaId":"32f63eff-1ebc-498e-9b02-ec5471e0e88f","orderId":108,"traceId":"ORD-8575b026","timestamp":1771059204.984885300,"orderNumber":"ORD-8575b026","totalAmount":10000}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-8575b026] [ORDER:108] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T14:23:25.046474700
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10000)
+Inventory reserved for order 108
+Received inventory.reserved {"sagaId":"32f63eff-1ebc-498e-9b02-ec5471e0e88f","orderId":108,"traceId":"ORD-8575b026","timestamp":"2026-02-14T08:53:24.984885300Z","orderNumber":"ORD-8575b026","totalAmount":10000}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-8575b026] [ORDER:ORD-8575b026] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T14:23:25.082213100
+Payment started for order ORD-8575b026 | Amount=10000
+Payment success sent: {"sagaId":"32f63eff-1ebc-498e-9b02-ec5471e0e88f","orderId":108,"traceId":"ORD-8575b026","timestamp":1771059205.084706300,"orderNumber":"ORD-8575b026"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-8575b026] [ORDER:ORD-8575b026] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS] at 2026-02-14T14:23:25.085464700
+Payment SUCCESS for ORD-8575b026 | Amount=10000
+Received payment.success: PaymentSuccessEvent()
+Payment success, order completed 108
+Received order.confirm.cmd: ConfirmOrderCommand()
+Starting PaymentServiceApplication using Java 17.0.12 with PID 17844 (F:\PROJECTS\git\distributed-order-system\payment-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started PaymentServiceApplication in 4.89 seconds (process running for 5.179)
+Starting PaymentServiceApplication using Java 17.0.12 with PID 16208 (F:\PROJECTS\git\distributed-order-system\payment-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started PaymentServiceApplication in 4.788 seconds (process running for 5.087)
+order.created sent: {"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":"2026-02-14T08:57:03.249973600Z","orderNumber":"ORD-b1a6b2d1","userId":123,"totalAmount":10000,"items":[{"productId":1,"quantity":1,"price":10000}],"createdAt":"2026-02-14T08:57:03.249973600Z"}
+Order created and saga started 109
+Received inventory.reserve.cmd: 109
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-b1a6b2d1] [ORDER:109] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T14:27:03.287720400
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-b1a6b2d1] [ORDER:109] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T14:27:03.293018600
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-b1a6b2d1] [ORDER:109] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T14:27:03.305576500
+Inventory Event Sent [inventory.reserved] => {"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":1771059423.249973600,"orderNumber":"ORD-b1a6b2d1","totalAmount":10000}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-b1a6b2d1] [ORDER:109] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T14:27:03.312646600
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10000)
+Inventory reserved for order 109
+Received inventory.reserved {"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":"2026-02-14T08:57:03.249973600Z","orderNumber":"ORD-b1a6b2d1","totalAmount":10000}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-b1a6b2d1] [ORDER:ORD-b1a6b2d1] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T14:27:03.533446200
+Payment started for order ORD-b1a6b2d1 | Amount=10000
+Failed to consume inventory event. Message={"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":"2026-02-14T08:57:03.249973600Z","orderNumber":"ORD-b1a6b2d1","totalAmount":10000}
+java.lang.IllegalStateException: Total amount missing in InventoryReservedEvent
+	at com.deepana.paymentservice.service.PaymentServiceImpl.processPayment(PaymentServiceImpl.java:57)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.deepana.paymentservice.service.PaymentServiceImpl$$SpringCGLIB$$0.processPayment(<generated>)
+	at com.deepana.paymentservice.kafka.InventoryEventConsumer.consume(InventoryEventConsumer.java:36)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.springframework.messaging.handler.invocation.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:168)
+	at org.springframework.kafka.listener.adapter.KotlinAwareInvocableHandlerMethod.doInvoke(KotlinAwareInvocableHandlerMethod.java:48)
+	at org.springframework.messaging.handler.invocation.InvocableHandlerMethod.invoke(InvocableHandlerMethod.java:119)
+	at org.springframework.kafka.listener.adapter.HandlerAdapter.invoke(HandlerAdapter.java:80)
+	at org.springframework.kafka.listener.adapter.MessagingMessageListenerAdapter.invokeHandler(MessagingMessageListenerAdapter.java:488)
+	at org.springframework.kafka.listener.adapter.MessagingMessageListenerAdapter.invoke(MessagingMessageListenerAdapter.java:425)
+	at org.springframework.kafka.listener.adapter.RecordMessagingMessageListenerAdapter.onMessage(RecordMessagingMessageListenerAdapter.java:92)
+	at org.springframework.kafka.listener.adapter.RecordMessagingMessageListenerAdapter.onMessage(RecordMessagingMessageListenerAdapter.java:52)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeOnMessage(KafkaMessageListenerContainer.java:2901)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeOnMessage(KafkaMessageListenerContainer.java:2880)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeRecordListener(KafkaMessageListenerContainer.java:2790)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeWithRecords(KafkaMessageListenerContainer.java:2632)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeRecordListener(KafkaMessageListenerContainer.java:2526)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeListener(KafkaMessageListenerContainer.java:2164)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeIfHaveRecords(KafkaMessageListenerContainer.java:1541)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.pollAndInvoke(KafkaMessageListenerContainer.java:1479)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.run(KafkaMessageListenerContainer.java:1348)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(CompletableFuture.java:1804)
+	at java.base/java.lang.Thread.run(Thread.java:842)
+Received inventory.reserved {"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":"2026-02-14T08:57:03.249973600Z","orderNumber":"ORD-b1a6b2d1","totalAmount":10000}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-b1a6b2d1] [ORDER:ORD-b1a6b2d1] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T14:27:06.611595300
+Payment started for order ORD-b1a6b2d1 | Amount=10000
+Failed to consume inventory event. Message={"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":"2026-02-14T08:57:03.249973600Z","orderNumber":"ORD-b1a6b2d1","totalAmount":10000}
+java.lang.IllegalStateException: Total amount missing in InventoryReservedEvent
+	at com.deepana.paymentservice.service.PaymentServiceImpl.processPayment(PaymentServiceImpl.java:57)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.deepana.paymentservice.service.PaymentServiceImpl$$SpringCGLIB$$0.processPayment(<generated>)
+	at com.deepana.paymentservice.kafka.InventoryEventConsumer.consume(InventoryEventConsumer.java:36)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.springframework.messaging.handler.invocation.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:168)
+	at org.springframework.kafka.listener.adapter.KotlinAwareInvocableHandlerMethod.doInvoke(KotlinAwareInvocableHandlerMethod.java:48)
+	at org.springframework.messaging.handler.invocation.InvocableHandlerMethod.invoke(InvocableHandlerMethod.java:119)
+	at org.springframework.kafka.listener.adapter.HandlerAdapter.invoke(HandlerAdapter.java:80)
+	at org.springframework.kafka.listener.adapter.MessagingMessageListenerAdapter.invokeHandler(MessagingMessageListenerAdapter.java:488)
+	at org.springframework.kafka.listener.adapter.MessagingMessageListenerAdapter.invoke(MessagingMessageListenerAdapter.java:425)
+	at org.springframework.kafka.listener.adapter.RecordMessagingMessageListenerAdapter.onMessage(RecordMessagingMessageListenerAdapter.java:92)
+	at org.springframework.kafka.listener.adapter.RecordMessagingMessageListenerAdapter.onMessage(RecordMessagingMessageListenerAdapter.java:52)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeOnMessage(KafkaMessageListenerContainer.java:2901)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeOnMessage(KafkaMessageListenerContainer.java:2880)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeRecordListener(KafkaMessageListenerContainer.java:2790)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeWithRecords(KafkaMessageListenerContainer.java:2632)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeRecordListener(KafkaMessageListenerContainer.java:2526)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeListener(KafkaMessageListenerContainer.java:2164)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeIfHaveRecords(KafkaMessageListenerContainer.java:1541)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.pollAndInvoke(KafkaMessageListenerContainer.java:1479)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.run(KafkaMessageListenerContainer.java:1348)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(CompletableFuture.java:1804)
+	at java.base/java.lang.Thread.run(Thread.java:842)
+Received inventory.reserved {"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":"2026-02-14T08:57:03.249973600Z","orderNumber":"ORD-b1a6b2d1","totalAmount":10000}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-b1a6b2d1] [ORDER:ORD-b1a6b2d1] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T14:27:09.674479300
+Payment started for order ORD-b1a6b2d1 | Amount=10000
+Failed to consume inventory event. Message={"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":"2026-02-14T08:57:03.249973600Z","orderNumber":"ORD-b1a6b2d1","totalAmount":10000}
+java.lang.IllegalStateException: Total amount missing in InventoryReservedEvent
+	at com.deepana.paymentservice.service.PaymentServiceImpl.processPayment(PaymentServiceImpl.java:57)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158)
+	at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133)
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371)
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130)
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719)
+	at com.deepana.paymentservice.service.PaymentServiceImpl$$SpringCGLIB$$0.processPayment(<generated>)
+	at com.deepana.paymentservice.kafka.InventoryEventConsumer.consume(InventoryEventConsumer.java:36)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.springframework.messaging.handler.invocation.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:168)
+	at org.springframework.kafka.listener.adapter.KotlinAwareInvocableHandlerMethod.doInvoke(KotlinAwareInvocableHandlerMethod.java:48)
+	at org.springframework.messaging.handler.invocation.InvocableHandlerMethod.invoke(InvocableHandlerMethod.java:119)
+	at org.springframework.kafka.listener.adapter.HandlerAdapter.invoke(HandlerAdapter.java:80)
+	at org.springframework.kafka.listener.adapter.MessagingMessageListenerAdapter.invokeHandler(MessagingMessageListenerAdapter.java:488)
+	at org.springframework.kafka.listener.adapter.MessagingMessageListenerAdapter.invoke(MessagingMessageListenerAdapter.java:425)
+	at org.springframework.kafka.listener.adapter.RecordMessagingMessageListenerAdapter.onMessage(RecordMessagingMessageListenerAdapter.java:92)
+	at org.springframework.kafka.listener.adapter.RecordMessagingMessageListenerAdapter.onMessage(RecordMessagingMessageListenerAdapter.java:52)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeOnMessage(KafkaMessageListenerContainer.java:2901)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeOnMessage(KafkaMessageListenerContainer.java:2880)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeRecordListener(KafkaMessageListenerContainer.java:2790)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.doInvokeWithRecords(KafkaMessageListenerContainer.java:2632)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeRecordListener(KafkaMessageListenerContainer.java:2526)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeListener(KafkaMessageListenerContainer.java:2164)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.invokeIfHaveRecords(KafkaMessageListenerContainer.java:1541)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.pollAndInvoke(KafkaMessageListenerContainer.java:1479)
+	at org.springframework.kafka.listener.KafkaMessageListenerContainer$ListenerConsumer.run(KafkaMessageListenerContainer.java:1348)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncRun.run(CompletableFuture.java:1804)
+	at java.base/java.lang.Thread.run(Thread.java:842)
+🚨 PAYMENT DLQ MESSAGE RECEIVED
+Payload: {"sagaId":"f0923d29-57a6-4eb2-b70e-9a50b3968881","orderId":109,"traceId":"ORD-b1a6b2d1","timestamp":"2026-02-14T08:57:03.249973600Z","orderNumber":"ORD-b1a6b2d1","totalAmount":10000}
+Starting PaymentServiceApplication using Java 17.0.12 with PID 17972 (F:\PROJECTS\git\distributed-order-system\payment-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started PaymentServiceApplication in 12.2 seconds (process running for 12.517)
+order.created sent: {"sagaId":"c5d4b443-32d3-4af3-b1c5-cd188c73bf62","orderId":110,"traceId":"ORD-63ac7386","timestamp":"2026-02-14T09:01:17.105879400Z","orderNumber":"ORD-63ac7386","userId":123,"totalAmount":10000,"items":[{"productId":1,"quantity":1,"price":10000}],"createdAt":"2026-02-14T09:01:17.105879400Z"}
+Order created and saga started 110
+Received inventory.reserve.cmd: 110
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-63ac7386] [ORDER:110] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T14:31:17.155234
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-63ac7386] [ORDER:110] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T14:31:17.160096900
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-63ac7386] [ORDER:110] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T14:31:17.169345900
+Inventory Event Sent [inventory.reserved] => {"sagaId":"c5d4b443-32d3-4af3-b1c5-cd188c73bf62","orderId":110,"traceId":"ORD-63ac7386","timestamp":1771059677.105879400,"orderNumber":"ORD-63ac7386","totalAmount":10000}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-63ac7386] [ORDER:110] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T14:31:17.172807400
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10000)
+Inventory reserved for order 110
+Received inventory.reserved {"sagaId":"c5d4b443-32d3-4af3-b1c5-cd188c73bf62","orderId":110,"traceId":"ORD-63ac7386","timestamp":"2026-02-14T09:01:17.105879400Z","orderNumber":"ORD-63ac7386","totalAmount":10000}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-63ac7386] [ORDER:ORD-63ac7386] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T14:31:17.366726900
+Payment started for order ORD-63ac7386 | Amount=10000
+Payment failed sent: {"sagaId":null,"orderId":110,"traceId":"ORD-63ac7386","timestamp":null,"orderNumber":"ORD-63ac7386","reason":"Forced failure for testing"}
+Received payment.failed: PaymentFailedEvent(reason=Forced failure for testing)
+Payment failed for order 110
+Received order.cancel.cmd: CancelOrderCommand(reason=PAYMENT_FAILED)
+Starting PaymentServiceApplication using Java 17.0.12 with PID 18096 (F:\PROJECTS\git\distributed-order-system\payment-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 16480 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started PaymentServiceApplication in 5.359 seconds (process running for 5.674)
+Started OrderServiceApplication in 7.162 seconds (process running for 7.592)
+Starting InventoryServiceApplication using Java 17.0.12 with PID 29652 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started InventoryServiceApplication in 5.067 seconds (process running for 5.469)
+order.created sent: {"sagaId":"16ac0f6d-80b8-49d4-8183-a3eb3a935ce2","orderId":111,"traceId":"ORD-9e2b6f0b","timestamp":"2026-02-14T10:03:46.666599700Z","orderNumber":"ORD-9e2b6f0b","userId":123,"totalAmount":10000,"items":[{"productId":1,"quantity":1,"price":10000}],"createdAt":"2026-02-14T10:03:46.666599700Z"}
+Order created and saga started 111
+Received inventory.reserve.cmd: 111
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-9e2b6f0b] [ORDER:111] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-02-14T15:33:46.997067
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-9e2b6f0b] [ORDER:111] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-14T15:33:47.307494400
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-9e2b6f0b] [ORDER:111] [STEP:RESERVED_PRODUCT_1] [STATUS:SUCCESS] at 2026-02-14T15:33:47.468649800
+Inventory Event Sent [inventory.reserved] => {"sagaId":"16ac0f6d-80b8-49d4-8183-a3eb3a935ce2","orderId":111,"traceId":"ORD-9e2b6f0b","timestamp":1771063426.666599700,"orderNumber":"ORD-9e2b6f0b","totalAmount":10000}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-9e2b6f0b] [ORDER:111] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-14T15:33:47.536545800
+Received inventory.reserved: InventoryReservedEvent(totalAmount=10000)
+Received inventory.reserved {"sagaId":"16ac0f6d-80b8-49d4-8183-a3eb3a935ce2","orderId":111,"traceId":"ORD-9e2b6f0b","timestamp":"2026-02-14T10:03:46.666599700Z","orderNumber":"ORD-9e2b6f0b","totalAmount":10000}
+Inventory reserved for order 111
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-9e2b6f0b] [ORDER:ORD-9e2b6f0b] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-14T15:33:47.662991500
+Payment started for order ORD-9e2b6f0b | Amount=10000
+Payment failed sent: {"sagaId":"16ac0f6d-80b8-49d4-8183-a3eb3a935ce2","orderId":111,"traceId":"ORD-9e2b6f0b","timestamp":1771063427.704255500,"orderNumber":"ORD-9e2b6f0b","reason":"Forced failure for testing"}
+Received payment.failed: PaymentFailedEvent(reason=Forced failure for testing)
+Payment failed for order 111
+Received order.cancel.cmd: CancelOrderCommand(reason=PAYMENT_FAILED)

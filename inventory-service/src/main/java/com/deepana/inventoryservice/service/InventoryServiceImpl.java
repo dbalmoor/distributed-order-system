@@ -2,14 +2,19 @@ package com.deepana.inventoryservice.service;
 
 import com.deepana.inventoryservice.common.logging.SagaLogger;
 import com.deepana.inventoryservice.entity.Inventory;
-import com.deepana.inventoryservice.dto.events.*;
+import com.deepana.inventoryservice.entity.ProcessedOrder;
 import com.deepana.inventoryservice.kafka.InventoryEventProducer;
 import com.deepana.inventoryservice.repository.InventoryRepository;
 import com.deepana.inventoryservice.repository.ProcessedOrderRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
+
+import com.deepana.saga.commondto.inventory.*;
+import com.deepana.saga.commondto.order.OrderItemEvent;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 
 @RequiredArgsConstructor
 @Service
@@ -21,17 +26,23 @@ public class InventoryServiceImpl implements InventoryService {
     private final InventoryEventProducer producer;
 
     @Override
-    public void processOrder(OrderCreatedEvent event) throws JsonProcessingException {
+    public void processReserve(ReserveInventoryCommand cmd) {
 
-        String orderNo = event.getOrderNumber();
+        Long orderId = cmd.getOrderId();
 
-        SagaLogger.success("INVENTORY", orderNo, "RECEIVED_ORDER");
+        SagaLogger.success("INVENTORY", String.valueOf(orderId), "RECEIVED_RESERVE_CMD");
 
         try {
 
-            SagaLogger.success("INVENTORY", orderNo, "CHECKING_STOCK");
+            // ✅ Idempotency
+            if (processedRepo.existsById(orderId)) {
+                log.info("Order {} already processed. Skipping.", orderId);
+                return;
+            }
 
-            for (OrderItemEvent item : event.getItems()) {
+            SagaLogger.success("INVENTORY", String.valueOf(orderId), "CHECKING_STOCK");
+
+            for (OrderItemEvent item : cmd.getItems()) {
 
                 Inventory inventory = inventoryRepository
                         .findByProductId(item.getProductId())
@@ -39,21 +50,12 @@ public class InventoryServiceImpl implements InventoryService {
                                 new RuntimeException("Product not found: " + item.getProductId())
                         );
 
-                // ✅ Already reserved?
-                if (processedRepo.existsById(event.getOrderId())) {
-                    log.info("Order {} already reserved. Skipping.", event.getOrderNumber());
-                    return;
-                }
-
-                SagaLogger.success("INVENTORY", orderNo,
-                        "FOUND_PRODUCT_" + item.getProductId());
-
                 if (inventory.getAvailableQty() < item.getQuantity()) {
 
-                    SagaLogger.failed("INVENTORY", orderNo,
+                    SagaLogger.failed("INVENTORY", String.valueOf(orderId),
                             "INSUFFICIENT_STOCK_PRODUCT_" + item.getProductId());
 
-                    return;
+                    throw new RuntimeException("Insufficient stock");
                 }
 
                 inventory.setAvailableQty(
@@ -66,36 +68,55 @@ public class InventoryServiceImpl implements InventoryService {
 
                 inventoryRepository.save(inventory);
 
-                SagaLogger.success("INVENTORY", orderNo,
+                SagaLogger.success("INVENTORY", String.valueOf(orderId),
                         "RESERVED_PRODUCT_" + item.getProductId());
             }
 
+            // ✅ Mark as processed
+            ProcessedOrder processed = new ProcessedOrder();
+            processed.setOrderId(orderId);
+            processed.setProcessedAt(LocalDateTime.now());
+
+            processedRepo.save(processed);
+
+            // ✅ Publish success event
             InventoryReservedEvent successEvent = new InventoryReservedEvent();
-            successEvent.setOrderId(event.getOrderId());
-            successEvent.setOrderNumber(orderNo);
-            successEvent.setAmount(event.getTotalAmount());
-            successEvent.setTraceId(event.getTraceId());
+
+            // 🔹 Copy BaseEvent fields
+            successEvent.setSagaId(cmd.getSagaId());
+            successEvent.setOrderId(cmd.getOrderId());
+            successEvent.setTraceId(cmd.getTraceId());
+            successEvent.setOrderNumber(cmd.getOrderNumber());
+            successEvent.setTimestamp(cmd.getTimestamp());
+
+            // 🔹 Business fields
+            successEvent.setTotalAmount(cmd.getTotalAmount());
 
             producer.sendInventoryReserved(successEvent);
 
-            SagaLogger.success("INVENTORY", orderNo, "EVENT_PUBLISHED");
+
+            SagaLogger.success("INVENTORY", String.valueOf(orderId), "RESERVED_EVENT_PUBLISHED");
 
         } catch (Exception ex) {
 
             InventoryFailedEvent failedEvent = new InventoryFailedEvent();
-            failedEvent.setOrderId(event.getOrderId());
-            failedEvent.setOrderNumber(orderNo);
+
+            // 🔹 Copy BaseEvent fields
+            failedEvent.setSagaId(cmd.getSagaId());
+            failedEvent.setOrderId(cmd.getOrderId());
+            failedEvent.setTraceId(cmd.getTraceId());
+            failedEvent.setOrderNumber(cmd.getOrderNumber());
+            failedEvent.setTimestamp(cmd.getTimestamp());
+
+            // 🔹 Business
             failedEvent.setReason(ex.getMessage());
-            failedEvent.setTraceId(event.getTraceId());
 
             producer.sendInventoryFailed(failedEvent);
 
-            SagaLogger.failed("INVENTORY", orderNo, "EVENT_PUBLISHED_FAILED");
 
-            log.warn("Inventory FAILED for order {} : {}",
-                    orderNo, ex.getMessage());
+            SagaLogger.failed("INVENTORY", String.valueOf(orderId), "FAILED_EVENT_PUBLISHED");
 
-            // ✅ No crash
+            log.warn("Inventory FAILED for order {} : {}", orderId, ex.getMessage());
         }
     }
 

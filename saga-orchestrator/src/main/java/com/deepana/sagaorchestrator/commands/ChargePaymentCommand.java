@@ -11,6 +11,6 @@ public class ChargePaymentCommand {
 
     private Long orderId;
     private String orderNumber;
-    private BigDecimal amount;
+    private BigDecimal totalAmount;
     private String traceId;
 }

@@ -1,7 +1,9 @@
 package com.deepana.sagaorchestrator.service;
 
-import com.deepana.sagaorchestrator.commands.*;
-import com.deepana.sagaorchestrator.dto.*;
+import com.deepana.saga.commondto.base.BaseEvent;
+import com.deepana.saga.commondto.inventory.*;
+import com.deepana.saga.commondto.order.*;
+import com.deepana.saga.commondto.payment.*;
 import com.deepana.sagaorchestrator.kafka.SagaCommandProducer;
 
 import lombok.RequiredArgsConstructor;
@@ -17,24 +19,23 @@ public class SagaServiceImpl implements SagaService {
 
     private final SagaCommandProducer producer;
 
-    // ================= ORDER CREATED =================
+    // =========================================================
+    // ORDER CREATED → RESERVE INVENTORY
+    // =========================================================
 
     @Override
     public void handleOrderCreated(OrderCreatedEvent event) {
 
         try {
-
             MDC.put("traceId", event.getTraceId());
 
             log.info("Saga STARTED for {}", event.getOrderNumber());
 
-            ReserveInventoryCommand command =
-                    new ReserveInventoryCommand(
-                            event.getOrderId(),
-                            event.getOrderNumber(),
-                            event.getTotalAmount(),
-                            event.getTraceId()
-                    );
+            ReserveInventoryCommand command = new ReserveInventoryCommand();
+
+            copyBaseFields(event, command);
+            command.setTotalAmount(event.getTotalAmount());
+            command.setItems(event.getItems());
 
             producer.sendReserveInventory(command);
 
@@ -46,25 +47,23 @@ public class SagaServiceImpl implements SagaService {
         }
     }
 
-    // ================= INVENTORY RESERVED =================
+    // =========================================================
+    // INVENTORY RESERVED → CHARGE PAYMENT
+    // =========================================================
 
     @Override
     public void handleInventoryReserved(InventoryReservedEvent event) {
 
         try {
-
             MDC.put("traceId", event.getTraceId());
 
             log.info("Inventory RESERVED for {}",
                     event.getOrderNumber());
 
-            ChargePaymentCommand command =
-                    new ChargePaymentCommand(
-                            event.getOrderId(),
-                            event.getOrderNumber(),
-                            event.getAmount(),
-                            event.getTraceId()
-                    );
+            ChargePaymentCommand command = new ChargePaymentCommand();
+
+            copyBaseFields(event, command);
+            command.setTotalAmount(event.getTotalAmount());
 
             producer.sendChargePayment(command);
 
@@ -76,25 +75,23 @@ public class SagaServiceImpl implements SagaService {
         }
     }
 
-    // ================= INVENTORY FAILED =================
+    // =========================================================
+    // INVENTORY FAILED → CANCEL ORDER
+    // =========================================================
 
     @Override
     public void handleInventoryFailed(InventoryFailedEvent event) {
 
         try {
-
             MDC.put("traceId", event.getTraceId());
 
             log.warn("Inventory FAILED for {}",
                     event.getOrderNumber());
 
-            CancelOrderCommand command =
-                    new CancelOrderCommand(
-                            event.getOrderId(),
-                            event.getOrderNumber(),
-                            event.getTraceId(),
-                            "INVENTORY_FAILED"
-                    );
+            CancelOrderCommand command = new CancelOrderCommand();
+
+            copyBaseFields(event, command);
+            command.setReason("INVENTORY_FAILED");
 
             producer.sendCancelOrder(command);
 
@@ -106,24 +103,22 @@ public class SagaServiceImpl implements SagaService {
         }
     }
 
-    // ================= PAYMENT SUCCESS =================
+    // =========================================================
+    // PAYMENT SUCCESS → CONFIRM ORDER
+    // =========================================================
 
     @Override
     public void handlePaymentSuccess(PaymentSuccessEvent event) {
 
         try {
-
             MDC.put("traceId", event.getTraceId());
 
             log.info("Payment SUCCESS for {}",
                     event.getOrderNumber());
 
-            ConfirmOrderCommand command =
-                    new ConfirmOrderCommand(
-                            event.getOrderId(),
-                            event.getOrderNumber(),
-                            event.getTraceId()
-                    );
+            ConfirmOrderCommand command = new ConfirmOrderCommand();
+
+            copyBaseFields(event, command);
 
             producer.sendConfirmOrder(command);
 
@@ -135,40 +130,32 @@ public class SagaServiceImpl implements SagaService {
         }
     }
 
-    // ================= PAYMENT FAILED =================
+    // =========================================================
+    // PAYMENT FAILED → RELEASE INVENTORY + CANCEL ORDER
+    // =========================================================
 
     @Override
     public void handlePaymentFailed(PaymentFailedEvent event) {
 
         try {
-
             MDC.put("traceId", event.getTraceId());
 
             log.warn("Payment FAILED for {}",
                     event.getOrderNumber());
 
             // 1️⃣ Release Inventory
-            ReleaseInventoryCommand releaseCmd =
-                    new ReleaseInventoryCommand(
-                            event.getOrderId(),
-                            event.getOrderNumber(),
-                            event.getTraceId()
-                    );
+            ReleaseInventoryCommand releaseCmd = new ReleaseInventoryCommand();
+            copyBaseFields(event, releaseCmd);
 
             producer.sendReleaseInventory(releaseCmd);
 
             log.info("ReleaseInventoryCommand sent for {}",
                     event.getOrderNumber());
 
-
             // 2️⃣ Cancel Order
-            CancelOrderCommand cancelCmd =
-                    new CancelOrderCommand(
-                            event.getOrderId(),
-                            event.getOrderNumber(),
-                            event.getTraceId(),
-                            "PAYMENT_FAILED"
-                    );
+            CancelOrderCommand cancelCmd = new CancelOrderCommand();
+            copyBaseFields(event, cancelCmd);
+            cancelCmd.setReason("PAYMENT_FAILED");
 
             producer.sendCancelOrder(cancelCmd);
 
@@ -178,5 +165,18 @@ public class SagaServiceImpl implements SagaService {
         } finally {
             MDC.clear();
         }
+    }
+
+    // =========================================================
+    // COMMON HELPER
+    // =========================================================
+
+    private void copyBaseFields(BaseEvent source, BaseEvent target) {
+
+        target.setSagaId(source.getSagaId());
+        target.setOrderId(source.getOrderId());
+        target.setOrderNumber(source.getOrderNumber());
+        target.setTraceId(source.getTraceId());
+        target.setTimestamp(source.getTimestamp());
     }
 }

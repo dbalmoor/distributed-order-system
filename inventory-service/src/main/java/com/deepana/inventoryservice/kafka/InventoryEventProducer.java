@@ -1,8 +1,7 @@
 package com.deepana.inventoryservice.kafka;
 
-import com.deepana.inventoryservice.dto.events.InventoryFailedEvent;
-import com.deepana.inventoryservice.dto.events.InventoryReservedEvent;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
+import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,38 +19,26 @@ public class InventoryEventProducer {
     private static final String RESERVED_TOPIC = "inventory.reserved";
     private static final String FAILED_TOPIC = "inventory.failed";
 
+    // ================= RESERVED =================
+
     public void sendInventoryReserved(InventoryReservedEvent event) {
 
-        try {
-            String json = objectMapper.writeValueAsString(event);
-
-            kafkaTemplate.send(RESERVED_TOPIC, event.getOrderNumber(), json);
-
-            log.info("Inventory reserved event sent: {}", json);
-
-        } catch (Exception e) {
-            log.error("Failed to send inventory reserved event", e);
-        }
+        send(RESERVED_TOPIC, String.valueOf(event.getOrderId()), event);
     }
 
-    public void sendInventoryFailed(InventoryFailedEvent event) throws JsonProcessingException {
+    // ================= FAILED =================
 
-        try {
-            String json = objectMapper.writeValueAsString(event);
+    public void sendInventoryFailed(InventoryFailedEvent event) {
 
-            kafkaTemplate.send(FAILED_TOPIC, event.getOrderNumber(), json);
-
-            log.info("Inventory failed event sent: {}", json);
-
-        } catch (Exception e) {
-            log.error("Failed to send inventory failed event", e);
-            throw e;
-        }
+        send(FAILED_TOPIC, String.valueOf(event.getOrderId()), event);
     }
+
+    // ================= COMMON SEND =================
 
     private void send(String topic, String key, Object payload) {
 
         try {
+
             String json = objectMapper.writeValueAsString(payload);
 
             kafkaTemplate.send(topic, key, json);
@@ -59,6 +46,8 @@ public class InventoryEventProducer {
             log.info("Inventory Event Sent [{}] => {}", topic, json);
 
         } catch (Exception e) {
+
+            log.error("Failed to publish event to {}", topic, e);
             throw new RuntimeException(e);
         }
     }

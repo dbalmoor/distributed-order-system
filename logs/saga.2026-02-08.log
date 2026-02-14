@@ -1,0 +1,56 @@
+Starting OrderServiceApplication using Java 17.0.12 with PID 28860 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting InventoryServiceApplication using Java 17.0.12 with PID 33472 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting InventoryServiceApplication using Java 17.0.12 with PID 32420 (F:\PROJECTS\git\distributed-order-system\inventory-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Starting OrderServiceApplication using Java 17.0.12 with PID 31816 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started InventoryServiceApplication in 8.015 seconds (process running for 8.597)
+Started OrderServiceApplication in 8.611 seconds (process running for 9.175)
+Starting PaymentServiceApplication using Java 17.0.12 with PID 16356 (F:\PROJECTS\git\distributed-order-system\payment-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started PaymentServiceApplication in 8.104 seconds (process running for 8.709)
+Order event sent: {"orderId":90,"orderNumber":"ORD-e691d106","userId":135,"totalAmount":10000,"items":[{"productId":2,"quantity":1,"price":10000}],"createdAt":"2026-02-08T11:50:05.0720154","traceId":"ORD-e691d106"}
+[SAGA] [SERVICE:ORDER] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:ORDER_CREATED] [STATUS:SUCCESS] at 2026-02-08T11:50:05.387357200
+Received order: ORD-e691d106
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:RECEIVED_ORDER] [STATUS:SUCCESS] at 2026-02-08T11:50:05.715536600
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-08T11:50:05.716547200
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:FOUND_PRODUCT_2] [STATUS:SUCCESS] at 2026-02-08T11:50:06.614364200
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:RESERVED_PRODUCT_2] [STATUS:SUCCESS] at 2026-02-08T11:50:06.674353400
+Inventory reserved event sent: {"orderNumber":"ORD-e691d106","orderId":90,"amount":10000,"traceId":"ORD-e691d106"}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-08T11:50:06.782558600
+Received inventory.reserved {"orderNumber":"ORD-e691d106","orderId":90,"amount":10000,"traceId":"ORD-e691d106"}
+Received inventory.reserved {"orderNumber":"ORD-e691d106","orderId":90,"amount":10000,"traceId":"ORD-e691d106"}
+[SAGA] [SERVICE:ORDER] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:INVENTORY_RESERVED] [STATUS:SUCCESS] at 2026-02-08T11:50:06.936068600
+Inventory reserved ORD-e691d106
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-08T11:50:06.952044700
+Payment started for order ORD-e691d106 | Amount=10000
+Payment failed sent: {"orderId":90,"orderNumber":"ORD-e691d106","reason":"Payment gateway declined","traceId":"ORD-e691d106"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:PAYMENT_FAILED] [STATUS:FAILED] at 2026-02-08T11:50:07.094585800
+Payment FAILED for ORD-e691d106 | Amount=10000
+Received payment.failed {"orderId":90,"orderNumber":"ORD-e691d106","reason":"Payment gateway declined","traceId":"ORD-e691d106"}
+[SAGA] [SERVICE:ORDER] [TRACE:ORD-e691d106] [ORDER:ORD-e691d106] [STEP:PAYMENT_FAILED] [STATUS:FAILED] at 2026-02-08T11:50:07.134423
+Order event sent: {"orderId":91,"orderNumber":"ORD-a0c58aff","userId":123,"totalAmount":10,"items":[{"productId":2,"quantity":1,"price":10}],"createdAt":"2026-02-08T11:50:21.9989525","traceId":"ORD-a0c58aff"}
+[SAGA] [SERVICE:ORDER] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:ORDER_CREATED] [STATUS:SUCCESS] at 2026-02-08T11:50:22.006855
+Received order: ORD-a0c58aff
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:RECEIVED_ORDER] [STATUS:SUCCESS] at 2026-02-08T11:50:22.025789900
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:CHECKING_STOCK] [STATUS:SUCCESS] at 2026-02-08T11:50:22.026306300
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:FOUND_PRODUCT_2] [STATUS:SUCCESS] at 2026-02-08T11:50:22.034981800
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:RESERVED_PRODUCT_2] [STATUS:SUCCESS] at 2026-02-08T11:50:22.042613300
+Inventory reserved event sent: {"orderNumber":"ORD-a0c58aff","orderId":91,"amount":10,"traceId":"ORD-a0c58aff"}
+[SAGA] [SERVICE:INVENTORY] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-02-08T11:50:22.044843300
+Received inventory.reserved: {"orderNumber":"ORD-a0c58aff","orderId":91,"amount":10,"traceId":"ORD-a0c58aff"}
+Received inventory.reserved {"orderNumber":"ORD-a0c58aff","orderId":91,"amount":10,"traceId":"ORD-a0c58aff"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:PAYMENT_STARTED] [STATUS:SUCCESS] at 2026-02-08T11:50:22.072305300
+Payment started for order ORD-a0c58aff | Amount=10
+Payment failed sent: {"orderId":91,"orderNumber":"ORD-a0c58aff","reason":"Payment gateway declined","traceId":"ORD-a0c58aff"}
+[SAGA] [SERVICE:PAYMENT] [TRACE:ORD-a0c58aff] [ORDER:ORD-a0c58aff] [STEP:PAYMENT_FAILED] [STATUS:FAILED] at 2026-02-08T11:50:22.078280900
+Payment FAILED for ORD-a0c58aff | Amount=10
+Received payment.failed {"orderId":91,"orderNumber":"ORD-a0c58aff","reason":"Payment gateway declined","traceId":"ORD-a0c58aff"}
+Payment failed pending ORD-a0c58aff
+Order ORD-a0c58aff CONFIRMED
+[SAGA] [SERVICE:ORDER] [TRACE:null] [ORDER:ORD-a0c58aff] [STEP:INVENTORY_RESERVED] [STATUS:SUCCESS] at 2026-02-08T11:50:22.114876400
+Starting OrderServiceApplication using Java 17.0.12 with PID 27296 (F:\PROJECTS\git\distributed-order-system\order-service\target\classes started by deepa in F:\PROJECTS\git\distributed-order-system)
+No active profile set, falling back to 1 default profile: "default"
+Started OrderServiceApplication in 8.249 seconds (process running for 8.568)

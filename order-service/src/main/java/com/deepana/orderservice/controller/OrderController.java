@@ -7,11 +7,13 @@ import com.deepana.orderservice.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/orders")
@@ -20,61 +22,74 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    /**
-     * Create a new Order
-     */
+    // ================= CREATE =================
+
     @PostMapping
     public ResponseEntity<OrderResponseDTO> createOrder(
             @Valid @RequestBody CreateOrderRequestDTO request
     ) {
 
-        OrderResponseDTO response = orderService.createOrder(request);
+        // Generate traceId at entry point
+        String traceId = "ORD-" + UUID.randomUUID()
+                .toString()
+                .substring(0, 8)
+                .toUpperCase();
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+        MDC.put("traceId", traceId);
+
+        try {
+
+            OrderResponseDTO response =
+                    orderService.createOrder(request);
+
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(response);
+
+        } finally {
+            MDC.clear();
+        }
     }
 
-    /**
-     * Get Order by ID
-     */
+    // ================= READ =================
+
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponseDTO> getOrderById(
             @PathVariable Long id
     ) {
 
-        OrderResponseDTO response = orderService.getOrderById(id);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+                orderService.getOrderById(id)
+        );
     }
 
-    /**
-     * Get Order by Order Number
-     */
     @GetMapping("/number/{orderNumber}")
     public ResponseEntity<OrderResponseDTO> getByOrderNumber(
             @PathVariable String orderNumber
     ) {
 
-        OrderResponseDTO response =
-                orderService.getByOrderNumber(orderNumber);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+                orderService.getByOrderNumber(orderNumber)
+        );
     }
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<OrderResponseDTO>> getOrdersByUser(
             @PathVariable Long userId) {
 
-        return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
+        return ResponseEntity.ok(
+                orderService.getOrdersByUserId(userId)
+        );
     }
+
+    // ================= CANCEL =================
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<OrderResponseDTO> cancelOrder(
             @PathVariable Long id) {
 
-        return ResponseEntity.ok(orderService.cancelOrder(id));
+        return ResponseEntity.ok(
+                orderService.cancelOrder(id)
+        );
     }
-
-
 }
