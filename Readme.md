@@ -60,8 +60,6 @@ payment.success / payment.failed
 ---
 
 ## 📊 Order Status Lifecycle
-
-```java
 CREATED
 INVENTORY_RESERVED
 PAYMENT_SUCCESS_PENDING
@@ -69,33 +67,42 @@ PAYMENT_FAILED_PENDING
 FAILED
 CANCELLED
 COMPLETED
-📨 Kafka Topics
-Events
+
+### 📨 Kafka Topics
+#### Events
 order.created
 inventory.reserved
 inventory.failed
 payment.success
 payment.failed
 order.cancelled
-Commands
+#### Commands
 inventory.reserve.cmd
 inventory.release.cmd
 payment.charge.cmd
 payment.refund.cmd
 order.confirm.cmd
 order.cancel.cmd
-Dead Letter Queues
+#### Dead Letter Queues
 order.dlq
 inventory.dlq
 payment.dlq
-📁 Project Structure
+
+## 📁 Project Structure
 distributed-order-system/
+
 │
+
 ├── order-service/
+
 ├── inventory-service/
+
 ├── payment-service/
+
 ├── saga-orchestrator/
+
 └── kafka/
+
 Each service contains:
 
 controller/
@@ -104,53 +111,54 @@ repository/
 dto/
 kafka/
 config/
-🧩 Saga Orchestrator
-Responsibilities
-Listens to domain events
 
-Controls workflow
+### 🧩 Saga Orchestrator
 
-Sends commands
+RESPONSIBILITIES: 
+- Listens to domain events
+- Controls workflow
+- Sends commands
+- Handles failures
+- Triggers compensation
 
-Handles failures
-
-Triggers compensation
-
-Event Handling
+### Event Handling
 Event	Action
-order.created	Reserve inventory
-inventory.reserved	Charge payment
-inventory.failed	Cancel order
-payment.success	Confirm order
-payment.failed	Release inventory + Cancel order
-💰 Payment Handling
+order.created	- Reserve inventory
+inventory.reserved	- Charge payment
+inventory.failed	- Cancel order
+payment.success	- Confirm order
+payment.failed	- Release inventory + Cancel order
+
+
+### 💰 Payment Handling
 All monetary values use:
 
 java.math.BigDecimal
 Floating-point types are avoided to prevent precision errors.
 
-🔁 Reliability Features
-Idempotency
+## 🔁 Reliability Features
+#### Idempotency
 Prevents duplicate processing using processed-order tracking.
 
-Optimistic Locking
+#### Optimistic Locking
 Used in Order Service for concurrent updates.
 
-Retry & DLQ
+#### Retry & DLQ
 Kafka consumers use retry mechanisms and Dead Letter Queues.
 
-Distributed Tracing
+#### Distributed Tracing
 Each message carries:
 
-traceId = orderNumber
+#### traceId = orderNumber
 Used with MDC logging.
 
-🧾 Logging Format
+## 🧾 Logging Format
 [SAGA] [SERVICE] [TRACE] [ORDER] [STEP] [STATUS]
 Example:
 
 [SAGA] [ORDER] [TRACE:ORD-123] [STEP:PAYMENT_SUCCESS] [STATUS:SUCCESS]
-⚙️ Technology Stack
+
+## ⚙️ Technology Stack
 Technology	Purpose
 Java 17	Programming Language
 Spring Boot 4	Framework
