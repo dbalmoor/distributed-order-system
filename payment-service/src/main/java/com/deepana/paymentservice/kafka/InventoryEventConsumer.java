@@ -2,6 +2,7 @@ package com.deepana.paymentservice.kafka;
 
 import com.deepana.paymentservice.service.PaymentService;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
+import com.deepana.saga.commondto.payment.ChargePaymentCommand;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -26,27 +27,17 @@ public class InventoryEventConsumer {
 
         try {
 
-            InventoryReservedEvent event =
-                    objectMapper.readValue(message, InventoryReservedEvent.class);
+            ChargePaymentCommand cmd =
+                    objectMapper.readValue(message, ChargePaymentCommand.class);
 
-            MDC.put("traceId", event.getTraceId());
+            MDC.put("traceId", cmd.getTraceId());
 
-            log.info("Received inventory.reserved {}", message);
+            log.info("Received payment.charge.cmd {}", message);
 
-            paymentService.processPayment(event);
+            paymentService.processPayment(cmd);
 
-
-        } catch (Exception e) {
-            log.error(
-                    "Failed to consume inventory event. Message={}",
-                    message,
-                    e
-            );
-            throw e;
         } finally {
-
-            MDC.clear(); // important
+            MDC.clear();
         }
-
     }
 }

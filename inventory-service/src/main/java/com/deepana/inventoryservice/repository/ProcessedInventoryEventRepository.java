@@ -1,6 +1,7 @@
 package com.deepana.inventoryservice.repository;
 
 import com.deepana.inventoryservice.entity.Inventory;
+import com.deepana.inventoryservice.entity.ProcessedInventoryEvent;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -8,12 +9,11 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
 
-public interface InventoryRepository
-        extends JpaRepository<Inventory, Long> {
+public interface ProcessedInventoryEventRepository extends JpaRepository<ProcessedInventoryEvent, Long> {
 
-    Optional<Inventory> findByProductId(Long productId);
+    boolean existsBySagaIdAndEventType(
+            String sagaId,
+            String eventType
+    );
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT i FROM Inventory i WHERE i.productId = :productId")
-    Optional<Inventory> findByProductIdForUpdate(Long productId);
 }

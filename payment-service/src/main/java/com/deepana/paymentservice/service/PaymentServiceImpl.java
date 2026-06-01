@@ -6,6 +6,7 @@ import com.deepana.paymentservice.kafka.PaymentEventProducer;
 import com.deepana.paymentservice.repository.PaymentRepository;
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
+import com.deepana.saga.commondto.payment.ChargePaymentCommand;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 
@@ -33,28 +34,28 @@ public class PaymentServiceImpl implements PaymentService {
     private final Random random = new Random();
 
     @Override
-    public void processPayment(InventoryReservedEvent event) {
+    public void processPayment(ChargePaymentCommand cmd) {
 
         try {
 
-            MDC.put("traceId", event.getTraceId());
+            MDC.put("traceId", cmd.getTraceId());
 
             SagaLogger.success(
                     "PAYMENT",
-                    event.getOrderNumber(),
+                    cmd.getOrderNumber(),
                     "PAYMENT_STARTED"
             );
 
             log.info(
                     "Payment started for order {} | Amount={}",
-                    event.getOrderNumber(),
-                    event.getTotalAmount()
+                    cmd.getOrderNumber(),
+                    cmd.getTotalAmount()
             );
 
             // ✅ Persist payment record
             Payment payment = new Payment();
 
-            if (event.getTotalAmount()
+            if (cmd.getTotalAmount()
                     .compareTo(new BigDecimal("10000")) == 0) {
 
                 payment.setStatus("FAILED");
@@ -62,13 +63,12 @@ public class PaymentServiceImpl implements PaymentService {
 
                 PaymentFailedEvent failedEvent = new PaymentFailedEvent();
 
-                failedEvent.setSagaId(event.getSagaId());
-                failedEvent.setOrderId(event.getOrderId());
-                failedEvent.setOrderNumber(event.getOrderNumber());
-                failedEvent.setTraceId(event.getTraceId());
+                copyBaseFields(cmd, failedEvent);
+
                 failedEvent.setTimestamp(Instant.now());
                 failedEvent.setReason("Forced failure for testing");
-
+                failedEvent.setTotalAmount(cmd.getTotalAmount());
+                failedEvent.setItems(cmd.getItems());
 
                 producer.sendFailed(failedEvent);
 
@@ -79,9 +79,9 @@ public class PaymentServiceImpl implements PaymentService {
             boolean success = random.nextInt(10) < 8;
 
 
-            payment.setOrderId(event.getOrderId());
-            payment.setOrderNumber(event.getOrderNumber());
-            payment.setAmount(event.getTotalAmount());
+            payment.setOrderId(cmd.getOrderId());
+            payment.setOrderNumber(cmd.getOrderNumber());
+            payment.setAmount(cmd.getTotalAmount());
             payment.setCreatedAt(LocalDateTime.now());
 
             if (success) {
@@ -90,22 +90,25 @@ public class PaymentServiceImpl implements PaymentService {
                 repository.save(payment);
 
                 PaymentSuccessEvent successEvent = new PaymentSuccessEvent();
-                copyBaseFields(event, successEvent);
+
+                copyBaseFields(cmd, successEvent);
 
                 successEvent.setTimestamp(Instant.now());
+                successEvent.setTotalAmount(cmd.getTotalAmount());
+                successEvent.setItems(cmd.getItems());
 
                 producer.sendSuccess(successEvent);
 
                 SagaLogger.success(
                         "PAYMENT",
-                        event.getOrderNumber(),
+                        cmd.getOrderNumber(),
                         "PAYMENT_SUCCESS"
                 );
 
                 log.info(
                         "Payment SUCCESS for {} | Amount={}",
-                        event.getOrderNumber(),
-                        event.getTotalAmount()
+                        cmd.getOrderNumber(),
+                        cmd.getTotalAmount()
                 );
 
             } else {
@@ -114,23 +117,26 @@ public class PaymentServiceImpl implements PaymentService {
                 repository.save(payment);
 
                 PaymentFailedEvent failedEvent = new PaymentFailedEvent();
-                copyBaseFields(event, failedEvent);
 
-                failedEvent.setReason("Payment gateway declined");
+                copyBaseFields(cmd, failedEvent);
+
                 failedEvent.setTimestamp(Instant.now());
+                failedEvent.setReason("Payment gateway declined");
+                failedEvent.setTotalAmount(cmd.getTotalAmount());
+                failedEvent.setItems(cmd.getItems());
 
                 producer.sendFailed(failedEvent);
 
                 SagaLogger.failed(
                         "PAYMENT",
-                        event.getOrderNumber(),
+                        cmd.getOrderNumber(),
                         "PAYMENT_FAILED"
                 );
 
                 log.warn(
                         "Payment FAILED for {} | Amount={}",
-                        event.getOrderNumber(),
-                        event.getTotalAmount()
+                        cmd.getOrderNumber(),
+                        cmd.getTotalAmount()
                 );
             }
 

@@ -1,6 +1,7 @@
 package com.deepana.inventoryservice.kafka;
 
 import com.deepana.inventoryservice.service.InventoryService;
+import com.deepana.saga.commondto.inventory.ReleaseInventoryCommand;
 import com.deepana.saga.commondto.inventory.ReserveInventoryCommand;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -44,4 +45,32 @@ public class InventoryCommandConsumer {
             MDC.clear();
         }
     }
+
+    @KafkaListener(
+            topics = "inventory.release.cmd",
+            groupId = "inventory-group"
+    )
+    public void consumeReleaseCommand(String message) {
+
+        try {
+
+            ReleaseInventoryCommand cmd =
+                    objectMapper.readValue(message, ReleaseInventoryCommand.class);
+
+            MDC.put("traceId", cmd.getTraceId());
+
+            log.info("Received inventory.release.cmd: {}", cmd.getOrderId());
+
+            inventoryService.processRelease(cmd);
+
+        } catch (Exception e) {
+
+            log.error("Inventory release failed", e);
+            throw new RuntimeException(e);
+
+        } finally {
+            MDC.clear();
+        }
+    }
+
 }
