@@ -4,30 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="47300821-19c1-44ea-8d37-62da6b81581a" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/entity/ProcessedInventoryEvent.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/repository/ProcessedInventoryEventRepository.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/outbox/OutboxEvent.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/outbox/OutboxPublisher.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/order-service/src/main/java/com/deepana/orderservice/outbox/OutboxRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/InventoryReservedEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/InventoryReservedEvent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/ReleaseInventoryCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/ReleaseInventoryCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/ReserveInventoryCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/inventory/ReserveInventoryCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/ChargePaymentCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/ChargePaymentCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/PaymentFailedEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/PaymentFailedEvent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/PaymentSuccessEvent.java" beforeDir="false" afterPath="$PROJECT_DIR$/common-dto/src/main/java/com/deepana/saga/commondto/payment/PaymentSuccessEvent.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/entity/ProcessedOrder.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/kafka/InventoryCommandConsumer.java" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/kafka/InventoryCommandConsumer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/repository/InventoryRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/repository/InventoryRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/repository/ProcessedOrderRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryService.java" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryServiceImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/kafka/InventoryEventConsumer.java" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/kafka/InventoryEventConsumer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/service/PaymentService.java" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/service/PaymentService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/service/PaymentServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/java/com/deepana/paymentservice/service/PaymentServiceImpl.java" afterDir="false" />
-    </list>
+    <list default="true" id="47300821-19c1-44ea-8d37-62da6b81581a" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
