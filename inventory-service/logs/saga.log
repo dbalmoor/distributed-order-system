@@ -1,5 +1,0 @@
-Starting InventoryServiceApplicationTests using Java 17.0.12 with PID 39324 (started by deepa in F:\PROJECTS\git\distributed-order-system\inventory-service)
-No active profile set, falling back to 1 default profile: "default"
-Started InventoryServiceApplicationTests in 12.478 seconds (process running for 30.736)
-[SAGA] [SERVICE:INVENTORY] [TRACE:null] [ORDER:42] [STEP:RECEIVED_RESERVE_CMD] [STATUS:SUCCESS] at 2026-10-08T14:46:41.162512600
-[SAGA] [SERVICE:INVENTORY] [TRACE:null] [ORDER:42] [STEP:RESERVED_EVENT_PUBLISHED] [STATUS:SUCCESS] at 2026-10-08T14:46:41.183781200
