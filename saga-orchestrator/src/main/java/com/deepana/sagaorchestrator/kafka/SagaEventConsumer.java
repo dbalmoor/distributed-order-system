@@ -4,6 +4,10 @@ package com.deepana.sagaorchestrator.kafka;
 import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
 import com.deepana.saga.commondto.order.OrderCreatedEvent;
+import com.deepana.saga.commondto.order.OrderCancelRequestedEvent;
+import com.deepana.saga.commondto.order.OrderCancelledEvent;
+import com.deepana.saga.commondto.order.OrderConfirmedEvent;
+import com.deepana.saga.commondto.order.CancelOrderCommand;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import com.deepana.sagaorchestrator.service.SagaService;
@@ -19,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class SagaEventConsumer {
 
     private final SagaService sagaService;
+    private final SagaCommandProducer sagaCommandProducer;
     private final ObjectMapper objectMapper;
 
     // ---------------- ORDER ----------------
@@ -120,6 +125,46 @@ public class SagaEventConsumer {
 
         } catch (Exception e) {
             log.error("Failed to process payment.failed", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @KafkaListener(
+            topics = "order.cancel.requested",
+            groupId = "saga-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void onOrderCancelRequested(String message) {
+        try {
+            OrderCancelRequestedEvent event =
+                    objectMapper.readValue(message, OrderCancelRequestedEvent.class);
+            CancelOrderCommand command = new CancelOrderCommand();
+            command.setSagaId(event.getSagaId());
+            command.setOrderId(event.getOrderId());
+            command.setOrderNumber(event.getOrderNumber());
+            command.setTraceId(event.getTraceId());
+            command.setTimestamp(event.getTimestamp());
+            command.setReason("USER_REQUESTED");
+            sagaCommandProducer.sendCancelOrder(command);
+        } catch (Exception e) {
+            log.error("Failed to process order.cancel.requested", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @KafkaListener(
+            topics = {"order.confirmed", "order.cancelled"},
+            groupId = "saga-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void onOrderTerminalEvent(String message) {
+        try {
+            com.deepana.saga.commondto.base.BaseEvent event =
+                    objectMapper.readValue(message, com.deepana.saga.commondto.base.BaseEvent.class);
+            log.info("Received terminal order event for order {}", event.getOrderId());
+            // TODO Phase 4: validate the saga pivot and complete the persisted saga from this event.
+        } catch (Exception e) {
+            log.error("Failed to process order.confirmed/order.cancelled", e);
             throw new RuntimeException(e);
         }
     }

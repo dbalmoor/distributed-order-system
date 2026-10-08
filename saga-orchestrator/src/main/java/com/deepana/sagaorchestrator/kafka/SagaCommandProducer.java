@@ -48,11 +48,11 @@ public class SagaCommandProducer {
     // ================= ORDER =================
 
     public void sendConfirmOrder(ConfirmOrderCommand cmd) {
-        send("order.confirm.cmd", cmd.getOrderNumber(), cmd);
+        send("order.confirm.cmd", String.valueOf(cmd.getOrderId()), cmd);
     }
 
     public void sendCancelOrder(CancelOrderCommand cmd) {
-        send("order.cancel.cmd", cmd.getOrderNumber(), cmd);
+        send("order.cancel.cmd", String.valueOf(cmd.getOrderId()), cmd);
     }
 
 

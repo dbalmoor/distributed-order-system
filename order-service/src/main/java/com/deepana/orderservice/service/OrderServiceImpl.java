@@ -8,16 +8,14 @@ import com.deepana.orderservice.exception.ResourceNotFoundException;
 import com.deepana.orderservice.kafka.OrderEventProducer;
 import com.deepana.orderservice.mapper.OrderMapper;
 import com.deepana.orderservice.repository.OrderRepository;
-import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
-import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
+import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.saga.commondto.order.*;
-import com.deepana.saga.commondto.payment.PaymentFailedEvent;
-import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.UUID;
@@ -30,6 +28,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
     private final OrderEventProducer orderEventProducer;
+    private final OrderStateMachine stateMachine;
 
     // ================= CREATE =================
 
@@ -110,123 +109,15 @@ public class OrderServiceImpl implements OrderService {
                                 "Order not found: " + orderId)
                 );
 
-        // Prevent cancelling final states
-        if (order.getStatus() == OrderStatus.COMPLETED ||
-                order.getStatus() == OrderStatus.FAILED ||
-                order.getStatus() == OrderStatus.CANCELLED) {
-
-            throw new IllegalStateException(
-                    "Cannot cancel order in state: " + order.getStatus());
-        }
-
-        order.setStatus(OrderStatus.CANCELLED);
-
-        orderRepository.save(order);
-
-        log.warn("Order {} manually cancelled", orderId);
+        OrderCancelRequestedEvent event = new OrderCancelRequestedEvent();
+        event.setOrderId(order.getId());
+        event.setOrderNumber(order.getOrderNumber());
+        event.setTraceId(order.getOrderNumber());
+        event.setTimestamp(java.time.Instant.now());
+        afterCommit(() -> orderEventProducer.sendCancelRequested(event));
+        log.info("Cancellation requested for order {}", orderId);
 
         return orderMapper.toResponse(order);
-    }
-
-
-    // ================= INVENTORY SUCCESS =================
-
-    @Override
-    @Transactional
-    public void handleInventoryReserved(InventoryReservedEvent event) {
-
-        MDC.put("traceId", event.getTraceId());
-
-        Order order = orderRepository
-                .findByIdForUpdate(event.getOrderId())
-                .orElseThrow();
-
-        if (order.getStatus() != OrderStatus.CREATED) {
-            return;
-        }
-
-        order.setStatus(OrderStatus.INVENTORY_RESERVED);
-
-        orderRepository.save(order);
-
-        log.info("Inventory reserved for order {}", order.getId());
-
-        MDC.clear();
-    }
-
-    // ================= INVENTORY FAILED =================
-
-    @Override
-    @Transactional
-    public void handleInventoryFailed(InventoryFailedEvent event) {
-
-        MDC.put("traceId", event.getTraceId());
-
-        Order order = orderRepository
-                .findByIdForUpdate(event.getOrderId())
-                .orElseThrow();
-
-        if (order.getStatus() == OrderStatus.FAILED) {
-            return;
-        }
-
-        order.setStatus(OrderStatus.FAILED);
-
-        orderRepository.save(order);
-
-        log.warn("Inventory failed for order {}", order.getId());
-
-        MDC.clear();
-    }
-
-    // ================= PAYMENT SUCCESS =================
-
-    @Override
-    @Transactional
-    public void handlePaymentSuccess(PaymentSuccessEvent event) {
-
-        MDC.put("traceId", event.getTraceId());
-
-        Order order = orderRepository
-                .findByIdForUpdate(event.getOrderId())
-                .orElseThrow();
-
-        if (order.getStatus() != OrderStatus.INVENTORY_RESERVED) {
-            return;
-        }
-
-        order.setStatus(OrderStatus.COMPLETED);
-
-        orderRepository.save(order);
-
-        log.info("Payment success, order completed {}", order.getId());
-
-        MDC.clear();
-    }
-
-    // ================= PAYMENT FAILED =================
-
-    @Override
-    @Transactional
-    public void handlePaymentFailure(PaymentFailedEvent event) {
-
-        MDC.put("traceId", event.getTraceId());
-
-        Order order = orderRepository
-                .findByIdForUpdate(event.getOrderId())
-                .orElseThrow();
-
-        if (order.getStatus() == OrderStatus.FAILED) {
-            return;
-        }
-
-        order.setStatus(OrderStatus.FAILED);
-
-        orderRepository.save(order);
-
-        log.warn("Payment failed for order {}", order.getId());
-
-        MDC.clear();
     }
 
     // ================= CONFIRM =================
@@ -235,19 +126,17 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public void confirmOrder(ConfirmOrderCommand cmd) {
 
-        Order order = orderRepository
-                .findById(cmd.getOrderId())
-                .orElseThrow();
+        Order order = orderRepository.findByIdForUpdate(cmd.getOrderId())
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + cmd.getOrderId()));
 
-        if (order.getStatus() == OrderStatus.COMPLETED) {
-            return;
+        if (stateMachine.transition(order.getStatus(), OrderStatus.COMPLETED, order.getId())) {
+            order.setStatus(OrderStatus.COMPLETED);
+            orderRepository.save(order);
+
+            OrderConfirmedEvent event = new OrderConfirmedEvent();
+            copyCommandFields(cmd, order, event);
+            afterCommit(() -> orderEventProducer.sendOrderConfirmed(event));
         }
-
-        order.setStatus(OrderStatus.COMPLETED);
-
-        orderRepository.save(order);
-
-        log.info("Order confirmed {}", order.getId());
     }
 
     // ================= CANCEL =================
@@ -256,19 +145,39 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public void cancelBySaga(CancelOrderCommand cmd) {
 
-        Order order = orderRepository
-                .findById(cmd.getOrderId())
-                .orElseThrow();
+        Order order = orderRepository.findByIdForUpdate(cmd.getOrderId())
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + cmd.getOrderId()));
 
-        if (order.getStatus() == OrderStatus.CANCELLED ||
-                order.getStatus() == OrderStatus.FAILED) {
-            return;
+        if (stateMachine.transition(order.getStatus(), OrderStatus.CANCELLED, order.getId())) {
+            order.setStatus(OrderStatus.CANCELLED);
+            orderRepository.save(order);
+
+            OrderCancelledEvent event = new OrderCancelledEvent();
+            copyCommandFields(cmd, order, event);
+            afterCommit(() -> orderEventProducer.sendOrderCancelled(event));
         }
+    }
 
-        order.setStatus(OrderStatus.CANCELLED);
+    private void copyCommandFields(
+            BaseEvent command,
+            Order order,
+            BaseEvent event) {
+        event.setOrderId(order.getId());
+        event.setOrderNumber(order.getOrderNumber());
+        event.setSagaId(command.getSagaId());
+        event.setTraceId(command.getTraceId());
+        event.setTimestamp(java.time.Instant.now());
+    }
 
-        orderRepository.save(order);
-
-        log.warn("Order cancelled by saga {}", order.getId());
+    private void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("Order event publication requires an active transaction");
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }

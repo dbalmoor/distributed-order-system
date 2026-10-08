@@ -99,6 +99,9 @@ public class OrderMapper {
         response.setUserId(order.getUserId());
         response.setTotalAmount(order.getTotalAmount());
         response.setStatus(order.getStatus());
+        response.setDisplayStatus(order.getStatus() == OrderStatus.CREATED
+                ? "PENDING"
+                : order.getStatus().name());
         response.setPaymentType(order.getPaymentType());
         response.setFulfillmentType(order.getFulfillmentType());
         response.setItems(items);

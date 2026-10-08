@@ -1,11 +1,14 @@
 package com.deepana.orderservice.kafka;
 
 import com.deepana.saga.commondto.order.*;
+import com.deepana.saga.commondto.base.BaseEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
@@ -36,19 +39,31 @@ public class OrderEventProducer {
     }
 
 
-    public void sendOrderCancelled(CancelOrderCommand command) {
+    public void sendCancelRequested(OrderCancelRequestedEvent event) {
+        send("order.cancel.requested", event);
+    }
 
-        try{
-            String json = objectMapper.writeValueAsString(command);
-            kafkaTemplate.send(
-                    "order.cancel.cmd",
-                    String.valueOf(command.getOrderId()),
-                    json
-            );
+    public void sendOrderConfirmed(OrderConfirmedEvent event) {
+        send("order.confirmed", event);
+    }
 
-            log.info("order.cancel.cmd sent: {}", command);
+    public void sendOrderCancelled(OrderCancelledEvent event) {
+        send("order.cancelled", event);
+    }
+
+    private void send(String topic, BaseEvent event) {
+        try {
+            String json = objectMapper.writeValueAsString(event);
+            kafkaTemplate.send(topic, String.valueOf(event.getOrderId()), json)
+                    .get(10, TimeUnit.SECONDS);
+            log.info("{} sent: {}", topic, json);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while publishing {}", topic, e);
+            throw new IllegalStateException("Interrupted while publishing " + topic, e);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("Failed to publish {}", topic, e);
+            throw new IllegalStateException("Failed to publish " + topic, e);
         }
     }
 }

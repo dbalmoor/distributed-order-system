@@ -23,6 +23,8 @@ public class OrderResponseDTO {
 
     private OrderStatus status;
 
+    private String displayStatus;
+
     private PaymentType paymentType;
 
     private FulfillmentType fulfillmentType;

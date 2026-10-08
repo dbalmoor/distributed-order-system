@@ -88,8 +88,6 @@ public class OrderController {
     public ResponseEntity<OrderResponseDTO> cancelOrder(
             @PathVariable Long id) {
 
-        return ResponseEntity.ok(
-                orderService.cancelOrder(id)
-        );
+        return ResponseEntity.accepted().body(orderService.cancelOrder(id));
     }
 }
