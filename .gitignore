@@ -6,3 +6,5 @@ logs/
 .vscode/
 .DS_Store
 HELP.md
+prompt.md
+requirement.md
