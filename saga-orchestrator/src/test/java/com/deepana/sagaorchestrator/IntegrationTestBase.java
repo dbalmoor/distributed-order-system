@@ -31,7 +31,6 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.flyway.enabled", () -> true);
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
-        registry.add("spring.kafka.listener.ack-mode", () -> "record");
         registry.add("outbox.poller.enabled", () -> false);
         registry.add("saga.watchdog.enabled", () -> false);
     }

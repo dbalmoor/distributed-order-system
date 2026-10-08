@@ -20,7 +20,7 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
     consumer:
-      group-id: order-service-group
+      group-id: order-group
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
 
@@ -39,3 +39,9 @@ outbox:
     interval-ms: ${OUTBOX_POLL_INTERVAL_MS:500}
     batch-size: ${OUTBOX_POLL_BATCH_SIZE:50}
     lease-ms: ${OUTBOX_LEASE_MS:30000}
+
+kafka:
+  retry:
+    delay-ms: ${KAFKA_RETRY_DELAY_MS:1000}
+    multiplier: ${KAFKA_RETRY_MULTIPLIER:2.0}
+    max-delay-ms: ${KAFKA_RETRY_MAX_DELAY_MS:10000}
