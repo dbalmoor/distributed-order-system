@@ -236,7 +236,33 @@ Saga state changes, audit log entries, and outgoing outbox messages are written
 within the same transaction. Late replies that are invalid in the current state
 are rejected without triggering additional business effects and are logged.
 
-## 7. Operator APIs and limitations
+## 7. Failure scenarios considered
+
+The implementation and tests consider these 16 scenarios; test-level evidence
+is recorded in the [failure matrix](docs/failure-matrix.md).
+
+1. Happy path completes the order and saga.
+2. Inventory reservation failure cancels the order.
+3. Payment failure releases stock, then cancels the order.
+4. Crash between database commit and Kafka publish; outbox delivery recovers.
+5. Orchestrator crash mid-saga and recovery (**NO TEST**).
+6. Duplicate `payment.charge.cmd` reuses the stored outcome.
+7. Duplicate `inventory.reserve.cmd` avoids a second stock mutation (**NO TEST**).
+8. Duplicate orchestrator event is ignored.
+9. Out-of-order event is rejected without changing saga state.
+10. Unacknowledged confirmation retries, then reaches `NEEDS_ATTENTION`.
+11. Inventory reservation timeout initiates release and cancellation.
+12. Late `payment.success` during compensation is logged and refunded at most once.
+13. Release before reserve is blocked by the `RELEASED` marker.
+14. Refund before charge is blocked by the `REFUNDED` marker.
+15. Cancellation after the payment pivot is rejected; the order completes.
+16. Poison-to-DLT routing and replay (**NO TEST**).
+
+Dedicated automated coverage is still missing for orchestrator crash recovery,
+duplicate inventory reserve behavior, and poison-message DLT routing,
+non-blocking behavior, and replay.
+
+## 8. Operator APIs and limitations
 
 The orchestrator provides:
 
@@ -260,7 +286,7 @@ behavior and DLT replay also lack dedicated automated integration coverage.
 The outstanding work is tracked in [requirement.md](requirement.md), and
 scenario-level test coverage is listed in the [failure matrix](docs/failure-matrix.md).
 
-## 8. Build and test
+## 9. Build and test
 
 The repository root `pom.xml` includes all six modules. Run the full build and
 tests with:

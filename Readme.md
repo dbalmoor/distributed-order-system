@@ -93,7 +93,27 @@ Payment success is the **pivot**. Before it, a failure, timeout, or accepted can
 | Late `inventory.reserved` after compensation starts | Payment is not triggered. |
 | Duplicate or invalid-for-state events | Recorded and rejected; no additional business effect. |
 
-The scenario-level coverage is tracked in the [failure matrix](docs/failure-matrix.md).
+Scenarios considered (automated coverage is listed in the [failure matrix](docs/failure-matrix.md)):
+
+1. Happy path completes the order and saga.
+2. Inventory reservation failure cancels the order.
+3. Payment failure releases stock, then cancels the order.
+4. Crash between database commit and Kafka publish; the outbox publishes after restart.
+5. Orchestrator crash mid-saga and recovery (**NO TEST**).
+6. Duplicate `payment.charge.cmd` reuses the stored outcome.
+7. Duplicate `inventory.reserve.cmd` does not mutate stock twice (**NO TEST**).
+8. Duplicate orchestrator event is ignored.
+9. Out-of-order event is rejected without changing saga state.
+10. Unacknowledged confirmation retries, then reaches `NEEDS_ATTENTION`.
+11. Inventory reservation timeout releases stock and cancels after acknowledgement.
+12. Late `payment.success` during compensation is logged and refunded at most once.
+13. Release before reserve is blocked by the `RELEASED` marker.
+14. Refund before charge is blocked by the `REFUNDED` marker.
+15. Cancellation after the payment pivot is rejected; the order completes.
+16. Poison message routes to DLT and can be replayed (**NO TEST**).
+
+Three scenarios lack dedicated automated coverage: orchestrator crash recovery,
+duplicate inventory reserve behavior, and poison-to-DLT routing/non-blocking/replay.
 
 ### Saga state machine
 
