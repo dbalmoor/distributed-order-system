@@ -1,0 +1,30 @@
+﻿### R6. Order state machine and single-writer status flow
+
+Problem in the current code
+- The current system mixes event-driven and command-driven order status mutations and has an ambiguous set of intermediate states.
+- The target design collapses the state machine to a simpler and safer order lifecycle.
+
+Chosen approach and alternatives
+- Order status has exactly three states: `CREATED` (shown to clients as `PENDING`), `COMPLETED`, and `CANCELLED`.
+- `INVENTORY_RESERVED` is removed from the public order model because the sequence of commands and events already encodes the reservation state in the saga and inventory DB, and the user-facing order state must stay minimal.
+- The orchestrator is the only component that drives the order lifecycle via `order.confirm.cmd` and `order.cancel.cmd`; order-service reacts only to REST and to those commands, then emits `order.confirmed` / `order.cancelled` through its outbox.
+- Alternative considered: retaining `FAILED` and the two `*_PENDING` states was rejected because they add ambiguity and are not needed when a saga can show `NEEDS_ATTENTION` as a recovery state outside the public order status tree.
+
+Data model changes
+- `Order.status` only accepts `CREATED`, `COMPLETED`, `CANCELLED`.
+- `displayStatus` can still show `PENDING` while the order is created but not yet terminal.
+
+Kafka topics, keys, and headers
+- Order-service emits `order.confirmed` and `order.cancelled` through the outbox after it updates the DB row.
+- The orchestrator is the consumer of the `order.confirmed` and `order.cancelled` domain events and completes the saga on those messages.
+
+Transaction boundaries
+- The order-service writes the status update and outbox row within one transaction, then commits. The Kafka publish occurs after the commit.
+
+Failure scenarios handled
+- Duplicate `order.confirm` or `order.cancel` command: the order-service validates the current state before writing and rejects invalid transitions.
+- Late or repeated completion/cancel messages: the system ignores them after the terminal state is reached.
+
+How it will be tested
+- Unit tests for valid transitions and illegal transitions.
+- Integration tests for order confirm/cancel actions emitted via the outbox and consumed by the orchestrator.

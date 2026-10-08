@@ -1,6 +1,9 @@
 server:
   port: 8083
 
+payment:
+  fail-amount-threshold: ${PAYMENT_FAIL_AMOUNT_THRESHOLD:}
+
 spring:
   application:
     name: payment-service
@@ -10,9 +13,13 @@ spring:
     username: postgres
     password: postgres
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
 
   kafka:

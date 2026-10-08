@@ -1,0 +1,265 @@
+﻿# Design for the distributed order-management system
+
+## 1. Summary and scope
+
+This document defines the target design for the repository as it exists today, with the findings from the audit treated as the source of truth. The main corrective shift is to make the saga orchestrator the only authority that moves Order status, while each service remains idempotent under at-least-once Kafka delivery.
+
+The design intentionally preserves existing service boundaries: `order-service`, `inventory-service`, `payment-service`, `saga-orchestrator`, `gateway-service`, and `common-dto`. The scope is correctness under failure, not a broad platform rewrite. The design is intentionally simple: state changes and outgoing messages are committed together through an outbox, consumers are idempotent, and the orchestrator persists saga state so it can resume after restart.
+
+Key decisions already made and followed in this document:
+
+- Pure orchestration: only the orchestrator drives Order status. Order-service reacts only to REST and to `order.confirm.cmd` / `order.cancel.cmd`.
+- Outbox in every publishing service, using a poller with `FOR UPDATE SKIP LOCKED`.
+- Persistent saga state: `OrderSaga` stores a String UUID `sagaId`, step log, deadline, and version.
+- Payment idempotency uses `sagaId` as the natural key with a unique constraint and returns the stored result on repeat.
+- Inventory uses a unique `(saga_id, event_type)` idempotency guard in the processed-event table, plus a new `inventory.released` event.
+- Kafka keys are `orderId` on all topics; producers use `acks=all` and `enable.idempotence=true`.
+- A repo-root parent/aggregator POM is added, with a GitHub Actions workflow.
+- Gateway `permitAll` is explicitly documented as a known limitation and is not fixed in this phase.
+
+This design is intentionally biased toward a boring, interview-safe architecture: transactional DB writes, explicit state transitions, and durable event publication, not optimistic assumptions about exactly-once processing.
+
+## 2. As-is architecture
+
+### Components
+
+- `order-service`: owns Order domain state, REST API, and status transitions triggered by orchestrator commands.
+- `inventory-service`: validates and reserves stock, emits `inventory.reserved` or `inventory.failed`, and later releases stock on compensating commands.
+- `payment-service`: charges the customer, emits `payment.success` or `payment.failed`, and later performs refunds for compensating actions.
+- `saga-orchestrator`: receives domain events and sends commands to drive the long-running saga.
+- `gateway-service`: routes API traffic and is intentionally permissive in the current code.
+- `common-dto`: shared command and event contracts used across services.
+
+### Existing message flow (as audited)
+
+The current implementation has a mix of event-driven and command-driven behavior. The orchestrator emits commands, but order-service also reacts directly to domain events. That is the root cause of status ambiguity and race-prone behavior. The design below removes that duplication by selecting a single writer.
+
+```mermaid
+flowchart LR
+    Client[Client / REST] --> OrderSvc[order-service]
+    OrderSvc -->|create order| Kafka[(Kafka)]
+    Kafka -->|order.created| Orchestrator[saga-orchestrator]
+    Orchestrator -->|inventory.reserve.cmd| Inventory[ inventory-service ]
+    Inventory -->|inventory.reserved| Orchestrator
+    Orchestrator -->|payment.charge.cmd| Payment[payment-service]
+    Payment -->|payment.success| Orchestrator
+    Orchestrator -->|order.confirm.cmd| OrderSvc
+    Orchestrator -->|order.cancel.cmd| OrderSvc
+    OrderSvc -->|status updates| DB[(PostgreSQL)]
+    Inventory -->|inventory.failed| Orchestrator
+    Payment -->|payment.failed| Orchestrator
+```
+
+### Data model and persistence observations
+
+The current system already has the following persistence patterns in scope:
+
+- Orders and inventory are stored in per-service PostgreSQL databases.
+- Payment rows are stored in payment-service; inventory idempotency records and processed events are stored in inventory-service.
+- The orchestrator contains `OrderSaga` as an entity, but the code does not actually use it as a persisted resume mechanism.
+- Some services have `@Version` in the model layer, but not consistently across the critical write paths.
+- The current code includes an `OutboxEvent` scaffold in order-service but does not actively use it for publication.
+
+### Kafka topics and keys observed in the current code
+
+The current implementation uses a set of event and command topics with inconsistent semantics. The target design below standardizes them around `orderId` as the message key for order-affinity ordering and consistent recovery.
+
+- `order.created` / `order.confirmed` / `order.cancelled`
+- `inventory.reserve.cmd` / `inventory.release.cmd`
+- `inventory.reserved` / `inventory.failed` / `inventory.released`
+- `payment.charge.cmd` / `payment.refund.cmd`
+- `payment.success` / `payment.failed` / `payment.refunded`
+
+## 3. Requirement status table
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| R0.1 Audit the as-is system | DONE | The repo contains an audit in `notes/audit.md` that is grounded in the checked-in code. |
+| R0.2 One-command local environment | PARTIAL | Docker Compose is present for Kafka but does not yet cover the full system and database topology. |
+| R0.3 Public REST API for orders | PARTIAL | REST routes exist, but there is no complete end-to-end demo script or verified runbook. |
+| R1 Transactional outbox in every service that publishes | MISSING | Current code publishes directly to Kafka without a durable outbox transaction. |
+| R2 Persistent saga state in the orchestrator | MISSING | `OrderSaga` exists, but there is no live persisted saga state or recovery path. |
+| R3 Idempotent consumers in every service | PARTIAL | Inventory has a processed-event check; payment is not deduplicated by a natural business key. |
+| R4 Kafka correctness configuration | PARTIAL | Producer/consumer config exists, but keying, offset semantics, topic creation, and retry policy are not yet consistent. |
+| R5 Correct compensation semantics | PARTIAL | Compensation flows do not yet wait for specific compensating acks before final state changes. |
+| R6 Explicit state machines | MISSING | Order transitions are ad hoc `if` checks, not a validated state machine. |
+| R7 Timeouts and stuck-saga detection | MISSING | There is no deadline-driven timeout flow or compensating-action policy with late reply protection. |
+| R8 Retry and DLQ strategy | PARTIAL | Retry/DLQ patterns exist in concept, but there is no consistent cross-service policy. |
+| R9 Unit tests for state machines and logic | MISSING | The repo has light smoke/context tests, but no deterministic correctness test suite. |
+| R10 Integration tests with Testcontainers | MISSING | There is no end-to-end Kafka/PostgreSQL saga failure suite. |
+| R11 Chaos-lite | MISSING | There is no small fault-injection harness covering duplicates and timeouts. |
+| R12 OpenTelemetry | MISSING | There is no explicit end-to-end tracing contract across Kafka and HTTP calls. |
+| R13 Metrics | MISSING | There are no business-level metrics for saga age, outbox lag, or duplicates. |
+| R14 Structured logging and audit trail | MISSING | Logs are not consistently structured around `traceId`, `sagaId`, and message IDs. |
+| R15 Client Idempotency-Key | MISSING | No client idempotency contract exists for mutating requests. |
+| R16 Inventory contention decision | PARTIAL | Inventory uses a pessimistic lock and may also have `@Version`, but the chosen canonical anti-over-sell rule is not yet explicit. |
+| R17 Reservation TTL tied to the watchdog | MISSING | There is no reservation deadline tied to the saga watchdog. |
+| R18 API hygiene | PARTIAL | API exists, but validation and error semantics are not yet standardized. |
+| R19 README rewrite | MISSING | The README is not a trustworthy operational runbook. |
+| R20 ADR list | MISSING | There is no maintained list of key architecture decisions. |
+| R21 Failure matrix | MISSING | The repo does not yet include a failure matrix tied to the tested scenarios. |
+| R22 Fix duplicate sendInventoryReserved | MISSING | The duplicate call is a known correctness bug and must be fixed with a regression test. |
+| R23 Single-writer order status | MISSING | The order service currently mixes event-driven and command-driven status mutation. |
+| R24 Parent/aggregator Maven build | MISSING | There is no root aggregator POM or CI-friendly full build target. |
+| R25 String UUID `sagaId` everywhere | MISSING | The orchestrator state model still needs a consistent String UUID contract. |
+| R26 Final cancel/fail outcome | MISSING | The system does not yet define one well-defined terminal state for compensated orders. |
+
+## 4. Cross-service component view
+
+```mermaid
+flowchart LR
+    Client[Client] --> Gateway[Gateway Service]
+    Gateway --> Order[Order Service]
+    Order --> OrderDB[(Order DB)]
+    Order --> OrderOutbox[Order Outbox]
+    OrderOutbox --> Broker[(Kafka)]
+
+    Broker --> SagaConsumer[Orchestrator Consumer]
+    SagaConsumer --> SagaState[(Saga State)]
+    SagaConsumer --> SagaOutbox[Orchestrator Outbox]
+    SagaOutbox --> Broker
+
+    Broker --> InventoryConsumer[Inventory Consumer]
+    InventoryConsumer --> InventoryDB[(Inventory DB)]
+    InventoryConsumer --> InventoryOutbox[Inventory Outbox]
+    InventoryOutbox --> Broker
+
+    Broker --> PaymentConsumer[Payment Consumer]
+    PaymentConsumer --> PaymentDB[(Payment DB)]
+    PaymentConsumer --> PaymentOutbox[Payment Outbox]
+    PaymentOutbox --> Broker
+```
+
+### 5.1 End-to-end behavior intended by this design
+
+The intended end state is a single, boring saga: `CREATED` -> `COMPLETED` or `CANCELLED`, with `NEEDS_ATTENTION` as a non-terminal recovery state when a compensating or retry action cannot complete within budget. The system guarantees at-least-once delivery and idempotent business effects; it does not promise exactly-once semantics.
+
+### 5.2 Happy path sequence
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant O as order-service
+    participant K as Kafka
+    participant S as saga-orchestrator
+    participant I as inventory-service
+    participant P as payment-service
+    participant DB as PostgreSQL
+
+    C->>O: POST /orders
+    O-->>C: 202 Accepted
+    O->>DB: insert Order(status=CREATED, displayStatus=PENDING)
+    O->>K: outbox order.created
+    K->>S: order.created
+    S->>DB: persist saga state; mark step inventory.reserve
+    S->>K: outbox inventory.reserve.cmd (orderId key)
+    K->>I: inventory.reserve.cmd
+    I->>DB: reserve stock + processed idempotency row
+    I->>K: outbox inventory.reserved
+    K->>S: inventory.reserved
+    S->>DB: mark step payment.charge
+    S->>K: outbox payment.charge.cmd
+    K->>P: payment.charge.cmd
+    P->>DB: insert Payment with UNIQUE(saga_id, type)
+    P->>K: outbox payment.success
+    K->>S: payment.success
+    S->>DB: mark step complete
+    S->>K: outbox order.confirm.cmd
+    K->>O: order.confirm.cmd
+    O->>DB: set Order.status=COMPLETED and emit order.confirmed outbox
+```
+
+### 5.3 Inventory failure path
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant O as Order Service
+    participant S as Saga Orchestrator
+    participant I as Inventory Service
+    participant DB as PostgreSQL
+
+    C->>O: POST /orders
+    O->>DB: insert CREATED order
+    O->>S: order.created
+    S->>I: inventory.reserve.cmd
+    I->>DB: stock unavailable; write inventory.failed
+    I-->>S: inventory.failed
+    S->>DB: mark step compensating
+    S->>O: order.cancel.cmd
+    O->>DB: set status=CANCELLED and emit order.cancelled outbox
+    O-->>C: 202 Accepted; status becomes CANCELLED when polled
+```
+
+### 5.4 Payment failure with release-then-cancel
+
+```mermaid
+sequenceDiagram
+    participant S as Saga Orchestrator
+    participant I as Inventory Service
+    participant P as Payment Service
+    participant O as Order Service
+    participant DB as PostgreSQL
+
+    S->>I: inventory.reserve.cmd
+    I->>DB: reserve stock
+    I-->>S: inventory.reserved
+    S->>P: payment.charge.cmd
+    P->>DB: insert Payment row, mark payment.failed
+    P-->>S: payment.failed
+    S->>DB: mark step compensating
+    S->>I: inventory.release.cmd
+    I->>DB: release stock; emit inventory.released
+    I-->>S: inventory.released
+    S->>O: order.cancel.cmd
+    O->>DB: set status=CANCELLED and emit order.cancelled outbox
+```
+
+### 5.5 Late payment.success for a saga already compensating or cancelled
+
+```mermaid
+sequenceDiagram
+    participant S as Saga Orchestrator
+    participant P as Payment Service
+    participant O as Order Service
+    participant I as Inventory Service
+    participant DB as PostgreSQL
+
+    Note over S: payment.success arrives while the saga is already COMPENSATING or CANCELLED
+    S->>P: payment.charge.cmd
+    P->>DB: payment inserted and success emitted
+    P-->>S: payment.success
+    S->>DB: mark saga as COMPENSATING; confirm step is invalid
+    S->>P: payment.refund.cmd
+    P->>DB: refund row written and payment.refunded emitted
+    P-->>S: payment.refunded
+    S->>I: inventory.release.cmd
+    I->>DB: release stock and emit inventory.released
+    I-->>S: inventory.released
+    S->>O: order.cancel.cmd
+    O->>DB: set status=CANCELLED and emit order.cancelled outbox
+```
+
+### 5.6 Timeout handling with compensating command and late reply safety
+
+```mermaid
+sequenceDiagram
+    participant S as Saga Orchestrator
+    participant I as Inventory Service
+    participant P as Payment Service
+    participant O as Order Service
+    participant DB as PostgreSQL
+
+    S->>I: inventory.reserve.cmd
+    I-->>S: no reply within deadline
+    S->>DB: mark saga as COMPENSATING
+    S->>I: inventory.release.cmd
+    I->>DB: inventory.release writes the RELEASED marker; emit inventory.released
+    I-->>S: inventory.released
+    S->>O: order.cancel.cmd
+    O->>DB: set status=CANCELLED and emit order.cancelled outbox
+    Note over S: late inventory.reserved arrives later
+    I-->>S: late inventory.reserved
+    S->>DB: reject state transition because compensation is already in progress; count duplicate and do not apply side effects
+    Note over S: same rule applies for payment.refund.cmd arriving before payment.charge.cmd: the later charge is rejected when the saga is already in release/compensation state
+```

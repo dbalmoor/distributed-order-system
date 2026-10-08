@@ -1,0 +1,93 @@
+﻿### R9. Unit tests
+
+- State machine tests for order lifecycle and saga transitions.
+- Idempotency tests for `Payment` by `(saga_id, type)` and inventory by `(saga_id, event_type)`.
+- Money and rounding tests for `BigDecimal` payments and refunds.
+- Orchestrator decision tests for timeout, compensation, and late-reply rejection.
+
+### R10. Testcontainers
+
+- Kafka + PostgreSQL integration suite covering the happy path, inventory failure, payment failure, duplicate delivery, out-of-order events, crash/restart, and timeout scenarios.
+- The stack must run under a single test harness and isolate each scenario without relying on local developer state.
+
+### R11. Chaos-lite
+
+- A small fault-injection harness that stops one service mid-saga, restarts it, and proves the system converges to a consistent terminal state without duplicate side effects.
+- Include the scenarios that simulate lost acknowledgements, delayed replies, and replays after restart.
+
+### R12. OpenTelemetry
+
+- Spans across HTTP and Kafka; `traceId`, `sagaId`, `orderId`, and the component name are propagated through message headers and MDC.
+- `tempo` or `jaeger` is included in the local stack for end-to-end troubleshooting.
+
+### R13. Metrics
+
+- Micrometer + Prometheus counters and gauges for saga starts, completions, compensations, retries, DLQ count, duplicate-event count, outbox backlog, and step latency.
+- Business-level metrics are part of the required correctness proof, not an afterthought.
+
+### R14. Structured logging and audit trail
+
+- Every service logs `traceId`, `sagaId`, `orderId`, `messageId`, and state transition metadata in a consistent JSON or structured format.
+- A persisted audit trail stores the state transitions for every saga and every order step.
+
+### R15. Client Idempotency-Key
+
+- `POST /orders` accepts an `Idempotency-Key` header.
+- Repeating the same key with the same payload returns the original result; repeating with a different payload is rejected as a conflict.
+
+### R16. Inventory contention decision
+
+- Primary approach: atomic conditional update is the canonical anti-over-sell mechanism.
+- Example: `UPDATE inventory SET available = available - :qty WHERE product_id = :id AND available >= :qty`.
+- The pessimistic lock remains as a fallback when the DB or domain needs a stronger lock, but it is not the primary solution.
+- `@Version` may remain for optimistic locking or concurrency detection, but it does not replace the atomic conditional update as the guard for oversell prevention.
+
+### R17. Reservation TTL tied to the watchdog
+
+- Reserved stock is released automatically when a saga exceeds its reservation deadline.
+- The watchdog and reserving service must share the same timeout policy and be coordinated around the same deadline clock.
+
+### R18. API hygiene
+
+- Validate request bodies, standardize error payloads, and ensure no sensitive data is logged.
+- This phase keeps authentication and authorization outside the core correctness work but documents them as known limitations.
+
+### R19. README rewrite
+
+- Remove unverified claims and replace them with a tested runbook, diagrams, configuration notes, and a known-limitations section.
+- Include how to run the stack, how to reproduce the failure scenarios, and how to inspect Kafka and DB metrics.
+
+### R20. ADR list
+
+- Add `docs/adr` with decisions for orchestration, outbox, idempotency, inventory contention, retry/DLQ, and the use of a shared DTO module.
+- Each ADR should state the decision, the context, the consequences, and the rejected alternatives.
+
+### R21. Failure matrix
+
+- A scenario table stating: issue, observable effect, compensating action, expected status, and which automated test proves it.
+- Include late `payment.success`, release-before-reserve race, timed-out inventory reservation, timed-out payment charge, and poison message handling.
+
+### R22. Fix the duplicate sendInventoryReserved call
+
+- Fix the duplicate `sendInventoryReserved` call in `InventoryServiceImpl.processReserve` and add a regression test covering duplicate emission under the success flow.
+- The current code must prove the service emits only one inventory-reserved message for one successful reservation.
+
+### R23. Single writer of Order status
+
+- Decide on one status-writer policy only: the order-service reacts only to REST and orchestrator commands, never to both domain events and commands.
+- Document the decision and enforce it in the code and in the integration tests.
+
+### R24. Parent/aggregator POM
+
+- Add a root parent/aggregator POM so `mvn verify` builds and tests every module from a single command.
+- Include the shared DTO module and the GitHub Actions workflow in the same build path.
+
+### R25. `sagaId` is a String UUID everywhere
+
+- Use `String sagaId` consistently across the orchestrator, payment, inventory, and order models.
+- Remove any mismatched type or implicit conversion and document the contract in the DTOs and DB schema.
+
+### R26. Final compensated order state
+
+- Define one terminal compensating outcome for an order that is cancelled or compensated: `CANCELLED` is the canonical state, and the system must not leave a compensated order in a fuzzy or half-failed state.
+- Document the rule and prove it with the failure matrix and the timeout/retry integration tests.

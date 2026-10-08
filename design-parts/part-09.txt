@@ -1,0 +1,115 @@
+﻿## 7. State machines
+
+### Order state machine
+
+`CREATED` -> `COMPLETED` or `CANCELLED`.
+
+- `CREATED`: initial order accepted and shown to clients as `PENDING`.
+- `COMPLETED`: terminal success state reached only after the orchestrator has observed the successful payment and the order-service has written the completed status.
+- `CANCELLED`: terminal compensation outcome reached after inventory release or payment refund completes.
+
+No public-order `FAILED` or `INVENTORY_RESERVED` state is kept; those are internal or transient saga details, not reliable client-facing status.
+
+### Saga state machine
+
+- `ACTIVE`: normal in-flight saga.
+- `COMPENSATING`: one step timed out or a late reply invalidated the confirm path; the orchestrator is issuing compensating commands.
+- `CANCELLED`: the saga reached a compensating terminal state after successful release/refund or an admin resolve.
+- `NEEDS_ATTENTION`: non-terminal recovery state when a compensating or retry step exceeds its retry budget and needs manual or admin intervention.
+
+Transitions across these states are validated and logged; invalid transitions are rejected before a new side effect is applied.
+
+## 8. Kafka topics, keys, and contracts
+
+| Topic | Producer | Key | Consumer | Notes |
+|---|---|---|---|---|
+| `order.created` | order-service | `orderId` | saga-orchestrator | Initial creation event |
+| `order.confirmed` | order-service | `orderId` | saga-orchestrator | Confirms terminal success |
+| `order.cancelled` | order-service | `orderId` | saga-orchestrator | Confirms terminal cancellation |
+| `inventory.reserve.cmd` | saga-orchestrator | `orderId` | inventory-service | Reserve stock |
+| `inventory.release.cmd` | saga-orchestrator | `orderId` | inventory-service | Compensating release |
+| `inventory.reserved` | inventory-service | `orderId` | saga-orchestrator | Successful reservation |
+| `inventory.failed` | inventory-service | `orderId` | saga-orchestrator | Reservation failure |
+| `inventory.released` | inventory-service | `orderId` | saga-orchestrator | Release acknowledged |
+| `payment.charge.cmd` | saga-orchestrator | `orderId` | payment-service | Payment request |
+| `payment.refund.cmd` | saga-orchestrator | `orderId` | payment-service | Compensation request |
+| `payment.success` | payment-service | `orderId` | saga-orchestrator | Payment pivot |
+| `payment.failed` | payment-service | `orderId` | saga-orchestrator | Payment failure |
+| `payment.refunded` | payment-service | `orderId` | saga-orchestrator | Refund acknowledged |
+| `order-retry` | internal | `orderId` | service listeners | Transient retry topic |
+| `order-dlq` | internal | `orderId` | admin replay script | Poison message sink |
+
+Notes:
+- Every topic uses `orderId` as the key for order affinity and stable replay ordering.
+- `order.confirmed` and `order.cancelled` are emitted by order-service through the outbox after the status update commit.
+- The DLQ and retry topics are explicit `NewTopic` beans, not implicit or ad-hoc topics.
+
+## 9. Failure matrix
+
+| Scenario | What happens | Expected state | Evidence/test |
+|---|---|---|---|
+| Payment succeeds, confirm unacked | `order.confirm.cmd` is retried idempotently with backoff; if retries fail, saga goes to `NEEDS_ATTENTION` | `NEEDS_ATTENTION` | retry integration test |
+| Late `payment.success` after compensation | The message is invalid for the current saga state; orchestrator issues `payment.refund.cmd` and continues cancel path | `CANCELLED` | late-success test |
+| Inventory reservation times out | Orchestrator asks for `inventory.release.cmd`; if the step never replies it stays in `COMPENSATING` and may escalate to `NEEDS_ATTENTION` | `COMPENSATING` / `NEEDS_ATTENTION` | timeout test |
+| Release-before-reserve race | `inventory.release.cmd` writes a `(saga_id, RELEASED)` marker; a later `inventory.reserve.cmd` for the same saga is rejected | idempotent rejection | race test |
+| Payment refund before charge | `payment.refund.cmd` is rejected if the charge never executed, and the saga records the invalid late-compensation event | `NEEDS_ATTENTION` or `CANCELLED` by policy | race test |
+| Poison message | Message goes to DLQ and is replayed only after review | DLQ / safe replay | DLQ test |
+
+## 10. Test strategy
+
+- Unit tests exercise the state machine and decision logic.
+- Integration tests use Testcontainers for Kafka and PostgreSQL.
+- Chaos-lite tests simulate service restarts, delayed replies, and duplicate message delivery.
+- Each phase of the rollout ships with a concrete test module proving the behavior.
+
+## 11. Rollout plan
+
+### Phase 0 â€” baseline and buildability
+- Parent/aggregator POM, GitHub Actions, Flyway baseline, full Docker Compose, and test harness.
+- Tests: module build smoke, Docker Compose startup, default configuration checks.
+
+### Phase 1 â€” payment idempotency and deterministic failure rule
+- Add `saga_id` to `Payment` with `UNIQUE(saga_id, type)`, use `INSERT ... ON CONFLICT DO NOTHING`, and add a deterministic, configurable failure rule.
+- Tests: duplicate-charge test, deterministic failure rule test.
+
+### Phase 2 â€” single-writer order state machine
+- Replace dual-writing with pure orchestration and emit `order.confirmed` / `order.cancelled` through the outbox.
+- Tests: state-machine valid/invalid transition tests, outbox-emission integration tests.
+
+### Phase 3 â€” transactional outbox
+- Add `outbox` tables to all publishing services and the poller with claim + lease logic.
+- Tests: DB commit + publish crash recovery, outbox replay, duplicate send prevention.
+
+### Phase 4 â€” persistent saga state
+- Persist `saga_instance` and `saga_step_log`, version, and deadline data. Make handlers idempotent and reject invalid late events.
+- Tests: restart mid-saga, duplicate message, invalid transition rejection.
+
+### Phase 5 â€” compensation, timeouts, watchdog
+- Add compensation commands, stepping to `COMPENSATING`, timeout policy, and the admin recovery path.
+- Tests: timeout-to-compensation, late-reply rejection, release-before-reserve race, admin retry/resolve.
+
+### Phase 6 â€” retry and DLQ
+- Add `@RetryableTopic`, DLQ topics, and a replay script.
+- Tests: retry-then-success, poison-to-DLQ, replay-safe implementation.
+
+### Phase 7 â€” observability
+- OpenTelemetry, structured logging, metrics, and Grafana dashboards.
+- Tests: trace correlation across HTTP/Kafka and dashboard data validation.
+
+### Phase 8 â€” docs and ADRs
+- README rewrite, ADR set, and failure matrix.
+- Tests: documentation check for claims that are backed by automated tests.
+
+## 12. Top 5 uncertainties
+
+1. Whether the repo will run with shared DBs or one database per service in production.
+2. Whether `FAILED` must remain as a historical status for the sake of reporting or is intentionally removed from the public state machine.
+3. Whether the gateway will remain intentionally permissive during the correctness-first implementation or whether security hardening is scheduled in a later phase.
+4. Whether the project wants a full Docker Compose environment or a lighter local test harness for developers.
+5. Whether the team prefers a single service-owned `outbox` table per module or a shared outbox schema pattern.
+
+## 13. Implementation notes
+
+- This design chooses boring correctness over cleverness: at-least-once plus idempotent consumers, explicit state transitions, and durable outbox publication are the core invariants.
+- The system is intentionally conservative about exactly-once guarantees and makes no claim beyond the tested behavior.
+- `NEEDS_ATTENTION` remains a recovery state, not a terminal public order status.

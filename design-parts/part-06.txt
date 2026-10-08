@@ -1,0 +1,37 @@
+﻿### R7. Timeouts and stuck-saga detection
+
+Problem in the current code
+- The repo has no explicit deadline or watchdog path for stalled work.
+- When a step never responds, the system cannot safely distinguish â€œnot yet completeâ€ from â€œpermanently failedâ€.
+
+Chosen approach and alternatives
+- A step times out when it exceeds its deadline without a durable reply. The orchestrator marks the saga as `COMPENSATING`, sends the compensating command for the timed-out step (`inventory.release.cmd` or `payment.refund.cmd`), and waits for the compensating acknowledge before proceeding.
+- `NEEDS_ATTENTION` is a non-terminal recovery state used only when the compensation or retry path itself cannot be acknowledged within its retry budget; it is not the way a normal timeout is finalized.
+- The orchestrator must reject late replies that imply a side effect when the saga is already in `COMPENSATING` or `CANCELLED`.
+- Alternative considered: marking the saga `FAILED` and leaving the side effects unresolved was rejected because it is not a well-defined terminal state for compensating flows.
+
+Data model changes
+- Add `deadline_at`, `last_heartbeat_at`, and `version` to `saga_instance`; step log records are appended only for valid, durable transitions.
+- Add a retry budget and a `needs_attention` flag on the step or saga record to allow manual admin recovery.
+
+Kafka topics, keys, and headers
+- Unknown-outcome timeouts trigger `inventory.release.cmd` or `payment.refund.cmd` with the same `orderId` key and the current `sagaId` in headers.
+- Later replies are ignored after the state becomes compensating, but still counted and logged as duplicates.
+
+Class-level changes
+- Add a watchdog job that scans for timed-out sagas and transitions them to `COMPENSATING` atomically with the compensating command emission.
+- Add an admin endpoint or CLI command to retry or force-resolve a saga stuck in `NEEDS_ATTENTION`.
+
+Transaction boundaries
+- The saga state transition to `COMPENSATING` and the compensating outbox row are inserted in the same transaction.
+- The command is not considered complete until the service acknowledges the compensating command.
+
+Failure scenarios handled
+- Inventory never replies: trigger `inventory.release.cmd` when the reservation is still pending and wait for the ack.
+- Payment never replies: trigger `payment.refund.cmd` when the payment step is uncertain and wait for the ack.
+- Late reply after compensation: reject, count, and log without side-effect.
+
+How it will be tested
+- Timed-out inventory reserve and payment charge flows.
+- Late `inventory.reserved` or `payment.success` arriving after compensation begins.
+- `NEEDS_ATTENTION` recovery path through the admin retry/resolve API.

@@ -1,0 +1,37 @@
+﻿### R4. Kafka correctness configuration
+
+Problem in the current code
+- Kafka configuration is not consistently aligned with the actual consumer behavior.
+- The YAML shows `ack-mode: manual` but no listener calls `Acknowledgment.acknowledge()`, so in practice the configured behavior is not active.
+- Producer keys and partition semantics are not standardized across all services.
+
+Chosen approach and alternatives
+- Standardize on `orderId` as the message key for every topic, including orchestrator commands and service-emitted events.
+- Set producer config to `acks=all`, `enable.idempotence=true`, `retries` with bounded retry policy, and add `max.in.flight.requests.per.connection` tuned appropriately when idempotence is enabled.
+- Use the default `RECORD` container `AckMode` and a `DefaultErrorHandler` with `@RetryableTopic` for transient failures; offsets are committed by the container only after the service method returns successfully and the transaction is complete.
+- Explicit `NewTopic` beans create all required topics with sensible partitions. The YAML group IDs are reconciled with the `@KafkaListener` `groupId` values so that a given service family consumes the intended stream consistently.
+- Alternative considered: leaving everything to Spring Boot defaults or using `MANUAL_IMMEDIATE` is rejected; the explicit requirement is to keep the offset commit semantics aligned with the transactional DB boundary and not to call `acknowledge()` manually.
+
+Data model changes
+- No schema-level DB change is required for the Kafka design alone; this design relies on stable keys and consumer-side safe commit semantics.
+
+Kafka topics, keys, and headers
+- Topics include `order.created`, `order.confirmed`, `order.cancelled`, `inventory.reserve.cmd`, `inventory.release.cmd`, `inventory.reserved`, `inventory.failed`, `inventory.released`, `payment.charge.cmd`, `payment.refund.cmd`, `payment.success`, `payment.failed`, `payment.refunded`, plus retry and DLQ topics named consistently by service and suffix (`-retry`, `-dlq`).
+- Keys are always `orderId` to preserve ordering within each order stream.
+- Headers include `messageId`, `sagaId`, `orderId`, `traceId`, `eventType`.
+
+Class-level changes
+- Add `@Bean NewTopic` declarations for the canonical topics and for retry/DLQ topics.
+- Add `@KafkaListener` `groupId` values that match the YAML `spring.kafka.consumer.group-id` configuration for each service.
+- Use `@RetryableTopic` for generic transient failures and keep a DLQ topic for poison messages.
+
+Transaction boundaries
+- The producer sends after the DB commit; the consumer processes the message, commits the business write and idempotency insert in the same transaction, and only then allows the Kafka container to commit the offset.
+
+Failure scenarios handled
+- Dead letter during a transient issue: `@RetryableTopic` retries with backoff.
+- Permanent poison message: DLQ is used and the failure is visible in logs and metrics.
+- Duplicate or replayed event: consumer idempotency rejects the duplicate before a side effect.
+
+How it will be tested
+- Integration tests verifying `acks=all`, topic creation, retry flow, and consistent group IDs across service startup.

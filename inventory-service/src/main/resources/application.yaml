@@ -9,6 +9,9 @@ spring:
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
   kafka:
     bootstrap-servers: localhost:9092
 
@@ -25,10 +28,9 @@ spring:
         spring.json.trusted.packages: com.deepana.saga.commondto
         spring.json.value.default.type: com.deepana.saga.commondto.base.BaseEvent
 
-
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
 
 

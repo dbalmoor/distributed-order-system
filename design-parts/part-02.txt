@@ -1,0 +1,112 @@
+﻿### R1. Transactional outbox in every service that publishes to Kafka
+
+Problem in the current code
+- The existing services publish directly to Kafka from business methods instead of writing a durable outbox row in the same transaction as the business write.
+- The `OutboxEvent` scaffold is present in order-service but never drives publication in practice.
+
+Chosen approach and alternatives
+- Every publish path writes the business change and a single outbox row in the same DB transaction. A dedicated poller then picks rows and sends Kafka messages.
+- The outbox row includes `message_id`, `aggregate_type`, `aggregate_id`, `event_type`, `payload`, `headers`, `status`, `attempt_count`, `lease_until`, `created_at`, `published_at`, `last_error`.
+- Poller locking is: `SELECT ... FOR UPDATE SKIP LOCKED` in a short claim transaction that sets `status=IN_PROGRESS` and `lease_until`; the message is published outside that claim and the row is then marked `PUBLISHED` or `FAILED`. A lease-expiry sweeper resets stuck rows so a crashed poller cannot hold them forever.
+- Multiple pollers may reorder messages for the same order when they claim per `aggregate_id`, so the design guarantees per-aggregate ordering only when rows are processed in `created_at` order for one aggregate; it does not promise global ordering across all aggregates.
+- Alternative considered: Debezium CDC. Rejected here because it adds operational complexity without being required to satisfy the repoâ€™s correctness problem.
+
+Data model changes
+- Create an `outbox` table in each publishing service.
+- DDL sketch: `message_id UUID PRIMARY KEY`, `aggregate_type TEXT NOT NULL`, `aggregate_id TEXT NOT NULL`, `event_type TEXT NOT NULL`, `payload JSONB NOT NULL`, `headers JSONB NOT NULL`, `status VARCHAR(16) NOT NULL DEFAULT 'NEW'`, `attempt_count INT NOT NULL DEFAULT 0`, `lease_until TIMESTAMP WITH TIME ZONE NULL`, `created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()`, `published_at TIMESTAMP WITH TIME ZONE NULL`, `last_error TEXT NULL`, `version BIGINT NOT NULL DEFAULT 0`.
+- Composite index on `(status, created_at)` and `(aggregate_type, aggregate_id, created_at)`.
+- Presence of `message_id` is required for dedupe and replay safety at the consumer boundary.
+
+Kafka topics, keys, and headers
+- Topics remain consistent with order, inventory, and payment domain events/commands; order-service also emits `order.confirmed` and `order.cancelled` through its outbox after state changes.
+- Message key remains `orderId` for all order-related topics.
+- Headers include `messageId`, `sagaId`, `orderId`, `traceId`, `eventType`.
+
+Class-level changes
+- Existing outbox classes are extended to carry a `messageId` and a small `OutboxPoller` that continuously polls and posts rows.
+- Order-service writes outbox rows for both `order.created` and its later `order.confirmed` / `order.cancelled` events.
+
+Transaction boundaries
+- Business write + outbox insert happen in the same transaction.
+- The Kafka publish happens after the commit, and the row is marked published or failed only after the producer call returns.
+- Ordering guarantee is per aggregate: for a given `aggregate_id`, rows are processed in `created_at` order. Multi-poller concurrency can reorder messages across different aggregates; that is acceptable because the system is not assuming cross-aggregate global ordering.
+
+Failure scenarios handled
+- Crash after DB commit but before Kafka send: row remains in `NEW`/`IN_PROGRESS` and is re-sent by the poller.
+- Poller crash: a lease or `FOR UPDATE SKIP LOCKED` prevents duplicate work.
+- Producer fails: row stays not-published; retry increment occurs and the message is eventually retried.
+
+How it will be tested
+- Unit test: outbox write gets created with a unique `messageId` in the same transaction as the business row.
+- Integration test: DB commit then crash before send, and verify eventual delivery with a single message.
+
+### R2. Persistent saga state in the orchestrator
+
+Problem in the current code
+- `OrderSaga` is present but not the real source of truth; no live saga state is persisted for recovery.
+- The orchestrator cannot resume after restart, nor can it reject out-of-order or duplicate events cleanly.
+
+Chosen approach and alternatives
+- Introduce `saga_instance` and `saga_step_log` tables and persist the sagaâ€™s state and step transitions in the same transaction as any command emission.
+- Use `version` for optimistic concurrency and `deadline_at` for timeout handling.
+- Alternative considered: replay from Kafka only. Rejected because the state would still be ambiguous after an unclean crash and late events would be impossible to reason about.
+
+Data model changes
+- `saga_instance` columns: `id BIGSERIAL PK`, `saga_id VARCHAR(36) UNIQUE NOT NULL`, `order_id BIGINT NOT NULL`, `status VARCHAR(32) NOT NULL`, `current_step VARCHAR(64) NOT NULL`, `deadline_at TIMESTAMP WITH TIME ZONE NULL`, `started_at TIMESTAMP WITH TIME ZONE NOT NULL`, `updated_at TIMESTAMP WITH TIME ZONE NOT NULL`, `version BIGINT NOT NULL DEFAULT 0`.
+- `saga_step_log` columns: `id BIGSERIAL PK`, `saga_id VARCHAR(36) NOT NULL`, `step_name VARCHAR(64) NOT NULL`, `event_type VARCHAR(64) NOT NULL`, `from_state VARCHAR(32) NULL`, `to_state VARCHAR(32) NULL`, `payload JSONB NULL`, `created_at TIMESTAMP WITH TIME ZONE NOT NULL`.
+- Indexes: `(saga_id, current_step)` and `(saga_id, event_type)`; no `created_at`-based index is needed for step log dedupe because duplicates are not inserted. This follows the requirement that duplicates are counted in a metric/log, not written to the step log.
+
+Kafka topics, keys, and headers
+- Orchestrator consumes `order.created`, `inventory.reserved`, `inventory.failed`, `inventory.released`, `payment.success`, `payment.failed`, `payment.refunded`, `order.confirmed`, and `order.cancelled`.
+- Commands are emitted with `orderId` as the Kafka key and include `messageId`, `sagaId`, `orderId`, and `traceId` headers.
+
+Class-level changes
+- `SagaServiceImpl` is converted into a state-machine-backed service that validates transitions and persists the next state as part of the same transaction as the outbox insert.
+- Add `OrderSagaRepository` and `SagaStepLogRepository`.
+- The orchestrator dedupes incoming events with a `processed_message` table keyed by `(consumer, message_id)` and rejects invalid transitions before a business side effect is applied.
+
+Transaction boundaries
+- Reads the current saga state, validates the allowed step, updates the DB, inserts the outbox row, and only then commits. The offset is acknowledged only after the DB transaction returns successfully.
+
+Failure scenarios handled
+- Crash during a step: the persisted saga row resumes at the last durable step.
+- Duplicate event: same `message_id` is recognized by the `processed_message` table and ignored; duplicate counts are recorded in metrics/logs.
+- Out-of-order event: invalid for the current state and rejected without side effects.
+
+How it will be tested
+- Unit tests for explicit valid and invalid transitions.
+- Restart test that crashes after DB write but before command send, then resumes and continues without duplicate side effects.
+
+### R3. Idempotent consumers in every service
+
+Problem in the current code
+- Inventory has a processed-event table but payment is not deduplicated by a natural business key.
+- Duplicate Kafka deliveries can cause duplicate charges, duplicate reservations, or duplicate refunds if idempotency is not enforced atomically with the business write.
+
+Chosen approach and alternatives
+- Payment dedupe is by the natural business key: `UNIQUE(saga_id, type)` on the `Payment` row; the service uses `INSERT ... ON CONFLICT DO NOTHING` and reads the stored payment result on repeat.
+- Inventory dedupe is by `UNIQUE(saga_id, event_type)` on the inventory processed-event table; the service also uses `INSERT ... ON CONFLICT DO NOTHING` before applying an inventory mutation.
+- The orchestrator dedupes by `processed_message` with `UNIQUE(consumer, message_id)`.
+- Alternative considered: a separate `payment_idempotency` table was rejected in favour of a single, business-natural unique key on the `Payment` row; it is simpler and easier to reason about in the same transaction.
+
+Data model changes
+- `payment` table adds `saga_id VARCHAR(36)` and a unique constraint `UNIQUE(saga_id, type)`.
+- `processed_inventory_event` table adds `saga_id VARCHAR(36) NOT NULL`, `event_type VARCHAR(64) NOT NULL`, `processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()`, plus `UNIQUE(saga_id, event_type)`.
+- `processed_message` table for orchestrator dedupe: `consumer_name TEXT NOT NULL`, `message_id UUID NOT NULL`, `processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()`, `PRIMARY KEY (consumer_name, message_id)`.
+
+Kafka topics, keys, and headers
+- All commands/events retain `orderId` as the key and `sagaId` as the business correlation ID in the payload or headers.
+
+Class-level changes
+- Service consumer methods do the dedupe insert and the business write in the same transaction.
+- Duplicate messages return the previous stored result instead of re-executing the business side effect.
+
+Transaction boundaries
+- The dedupe insert and business write occur in a single transaction, before the consumer offset is acknowledged.
+
+Failure scenarios handled
+- Duplicate `payment.charge.cmd`: the `INSERT ... ON CONFLICT DO NOTHING` succeeds or fails atomically; the service reads the stored result and emits the original outcome again if needed.
+- Duplicate inventory event: same `saga_id` / `event_type` is ignored and the stored result is returned.
+
+How it will be tested
+- Integration tests for duplicate payment charge delivery, duplicate inventory reserve, and duplicate orchestrator message IDs.

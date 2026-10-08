@@ -1,0 +1,33 @@
+﻿### R8. Retry and DLQ strategy
+
+Problem in the current code
+- Retries and dead-letter behavior exist only conceptually; they are not formalized as a consistent contract across the services.
+
+Chosen approach and alternatives
+- Use `@RetryableTopic` for transient failures with backoff and a DLQ topic for poison messages.
+- Retry only for classes of exceptions that are known to be transient (timeouts, temporary dependency issues, optimistic locking conflicts, transient network failures). Permanent validation failures or poison payloads go directly to the DLQ.
+- Keep DLQ messages with original headers plus failure reason and stack information. A replay script or admin endpoint allows re-injecting a message after review, with idempotent consumers making replay safe.
+- Alternative considered: a `dlq_message` table was rejected because the repo already has a clear Kafka-topic-based DLQ contract and a replay script is simpler to operate and reason about.
+
+Data model changes
+- No separate `dlq_message` table is required. The DLQ topic is the durable source of truth for replay.
+
+Kafka topics, keys, and headers
+- Topics include `*-retry`, `*-dlq`, plus the main topics. The same `orderId` key is preserved in replay so the order stream remains predictable.
+
+Class-level changes
+- Add `@RetryableTopic` and a `DefaultErrorHandler` on each listener.
+- Expose a small replay script or admin endpoint that reads from the DLQ topic and re-sends the original payload after an operator review.
+
+Transaction boundaries
+- The consumer must finish the business write and idempotency insert before offset commit, otherwise retries could duplicate work.
+
+Failure scenarios handled
+- Transient dependency outage: retry with backoff and eventual success.
+- Poison message: immediate DLQ routing.
+- Replay: safe because the consumers are idempotent and reject duplicates by natural business key or `message_id`.
+
+How it will be tested
+- Retry then success path.
+- Poison message to DLQ.
+- Replay of a previously failed message with idempotent repeated processing.

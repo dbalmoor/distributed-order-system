@@ -1,0 +1,36 @@
+﻿### R5. Correct compensation semantics
+
+Problem in the current code
+- The previous design treated compensation as an afterthought and could silently ignore a late success or a lost confirm signal.
+- The design must now be explicit: payment success is the pivot and the order is only confirmed after that success is durable.
+
+Chosen approach and alternatives
+- `payment.success` is the point of no return for the normal success path. Once payment is successful, the orchestrator may continue to the confirm step, but if `order.confirm.cmd` is not acknowledged, the orchestrator retries it idempotently with backoff and, if the retry budget is exhausted, moves the saga to `NEEDS_ATTENTION` rather than pretending the order is complete.
+- A refund is only triggered for a real compensating scenario: a `payment.success` arriving after the saga has already moved to `COMPENSATING` or `CANCELLED` is late and therefore invalid; the orchestrator issues `payment.refund.cmd` and preserves the business effect of the refund.
+- Alternative considered: â€œconfirm fails, so refundâ€ is rejected because the confirm step is a command to the order service, not a payment-side failure. The real and valid refund path is a late success after compensation is already underway.
+
+Data model changes
+- Add `saga_id` to the `Payment` row with a unique constraint and use `INSERT ... ON CONFLICT DO NOTHING` to prevent double charging.
+- Add an explicit `inventory.released` event and a `released` idempotency marker keyed by `(saga_id, event_type)` to prevent a double release or a re-run of a compensating action.
+
+Kafka topics, keys, and headers
+- The normal path stays `order.created -> inventory.reserve.cmd -> inventory.reserved -> payment.charge.cmd -> payment.success -> order.confirm.cmd -> order.confirmed`.
+- The compensation path is `inventory.release.cmd -> inventory.released` and `payment.refund.cmd -> payment.refunded` with `orderId` keys and explicit saga correlation in headers.
+
+Class-level changes
+- `SagaServiceImpl` must reject a confirm step when the saga is already `COMPENSATING` or `CANCELLED` and must emit the refund path instead of treating it as a normal success.
+- The order-service emits `order.confirmed` and `order.cancelled` through its outbox; the orchestrator does not directly mutate Order status.
+
+Transaction boundaries
+- The dedupe insert and side effect occur in the same transaction before the offset is committed.
+- The orchestrator sends a compensating command only after the saga state transition to `COMPENSATING` is committed.
+
+Failure scenarios handled
+- Unacknowledged confirm command: retry with backoff; if retries exhaust, move to `NEEDS_ATTENTION` but never silently claim success.
+- Late `payment.success`: refund based on the valid compensation state and count the duplicate as a metrics event.
+- Any duplicate reply after the compensation step: reject as invalid and emit a metric/log entry only.
+
+How it will be tested
+- Duplicate late success after compensation.
+- Confirm command retries and escalation to `NEEDS_ATTENTION`.
+- Refund path after a late success is idempotent and does not create a second refund.

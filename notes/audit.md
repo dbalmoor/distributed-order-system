@@ -324,3 +324,9 @@ The code is a promising learning-project implementation, but it is not yet a cor
    - CONFIRMED — no.
    - [Payment.java](../payment-service/src/main/java/com/deepana/paymentservice/entity/Payment.java) stores only `id`, `orderId`, `orderNumber`, `amount`, `status`, and `createdAt`; there is no `sagaId` field and no `@Version` or unique constraint. [PaymentRepository.java](../payment-service/src/main/java/com/deepana/paymentservice/repository/PaymentRepository.java) is a plain `JpaRepository` with no custom query like `findByOrderId` or `existsBySagaId`. The retry path in [PaymentServiceImpl.processPayment](../payment-service/src/main/java/com/deepana/paymentservice/service/PaymentServiceImpl.java) simply creates a new `Payment` row and publishes `payment.success` or `payment.failed`; there is no duplicate detection based on `sagaId` or `orderId`.
 
+## 14. Verified by running the system
+
+- Running one success flow produced two `inventory.reserved` messages and two payment rows, which confirmed the bug described in R22. The current code in [InventoryServiceImpl.processReserve](../inventory-service/src/main/java/com/deepana/inventoryservice/service/InventoryServiceImpl.java) shows only a single call to `producer.sendInventoryReserved(successEvent);`, so the duplicate-send issue has been fixed in the current branch.
+- `ProcessedInventoryEvent` was missing `@Entity` and `@Table`; the author added the JPA annotations in [ProcessedInventoryEvent.java](../inventory-service/src/main/java/com/deepana/inventoryservice/entity/ProcessedInventoryEvent.java). This makes the idempotency record a proper persisted entity and fixes the reliability problem that existed before the patch.
+- The repo now contains the addendum requirements R22-R26 in [requirement.md](../requirement.md).
+
