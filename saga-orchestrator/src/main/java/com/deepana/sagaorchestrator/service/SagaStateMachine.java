@@ -36,6 +36,12 @@ public class SagaStateMachine {
             case CANCEL_REQUESTED -> is(current, SagaStatus.ACTIVE, SagaStep.RESERVE_INVENTORY)
                     || is(current, SagaStatus.ACTIVE, SagaStep.CHARGE_PAYMENT)
                     ? next(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER) : Optional.empty();
+            case ADMIN_RETRY_CONFIRM -> is(current, SagaStatus.NEEDS_ATTENTION, SagaStep.CONFIRM_ORDER)
+                    ? next(SagaStatus.ACTIVE, SagaStep.CONFIRM_ORDER) : Optional.empty();
+            case ADMIN_RETRY_COMPENSATION -> is(current, SagaStatus.NEEDS_ATTENTION, SagaStep.CANCEL_ORDER)
+                    ? next(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER) : Optional.empty();
+            case ADMIN_FORCE_RESOLVE -> current.status() == SagaStatus.NEEDS_ATTENTION
+                    ? next(SagaStatus.CANCELLED, SagaStep.CANCELLED) : Optional.empty();
         };
     }
 

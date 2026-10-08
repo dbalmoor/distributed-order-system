@@ -7,6 +7,7 @@ import com.deepana.sagaorchestrator.entity.SagaTransition;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,7 +37,16 @@ class SagaStateMachineTest {
                 Map.entry(new Case(SagaStatus.ACTIVE, SagaStep.RESERVE_INVENTORY, SagaTrigger.CANCEL_REQUESTED),
                         new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)),
                 Map.entry(new Case(SagaStatus.ACTIVE, SagaStep.CHARGE_PAYMENT, SagaTrigger.CANCEL_REQUESTED),
-                        new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)));
+                        new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)),
+                Map.entry(new Case(SagaStatus.NEEDS_ATTENTION, SagaStep.CONFIRM_ORDER,
+                        SagaTrigger.ADMIN_RETRY_CONFIRM),
+                        new SagaTransition(SagaStatus.ACTIVE, SagaStep.CONFIRM_ORDER)),
+                Map.entry(new Case(SagaStatus.NEEDS_ATTENTION, SagaStep.CANCEL_ORDER,
+                        SagaTrigger.ADMIN_RETRY_COMPENSATION),
+                        new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)),
+                Map.entry(new Case(SagaStatus.NEEDS_ATTENTION, SagaStep.CONFIRM_ORDER,
+                        SagaTrigger.ADMIN_FORCE_RESOLVE),
+                        new SagaTransition(SagaStatus.CANCELLED, SagaStep.CANCELLED)));
 
         transitions.forEach((input, expected) ->
                 assertThat(stateMachine.transition(snapshot(input.status(), input.step()), input.trigger()))
@@ -61,6 +71,10 @@ class SagaStateMachineTest {
                             || trigger == SagaTrigger.PAYMENT_REFUNDED))
                             || (status == SagaStatus.CANCELLED && step == SagaStep.CANCELLED
                             && (trigger == SagaTrigger.INVENTORY_RELEASED || trigger == SagaTrigger.PAYMENT_REFUNDED));
+                    isAllowed = isAllowed || (status == SagaStatus.NEEDS_ATTENTION
+                            && ((step == SagaStep.CONFIRM_ORDER && trigger == SagaTrigger.ADMIN_RETRY_CONFIRM)
+                            || (step == SagaStep.CANCEL_ORDER && trigger == SagaTrigger.ADMIN_RETRY_COMPENSATION)
+                            || trigger == SagaTrigger.ADMIN_FORCE_RESOLVE));
                     if (!isAllowed) {
                         assertThat(stateMachine.transition(snapshot(status, step), trigger)).isEmpty();
                     }
@@ -70,7 +84,8 @@ class SagaStateMachineTest {
     }
 
     private SagaSnapshot snapshot(SagaStatus status, SagaStep step) {
-        return new SagaSnapshot(UUIDs.SAGA_ID, 1L, status, step, 0L);
+        return new SagaSnapshot(UUIDs.SAGA_ID, 1L, status, step, 0L,
+                Instant.EPOCH, Instant.EPOCH, 0, status == SagaStatus.NEEDS_ATTENTION);
     }
 
     private record Case(SagaStatus status, SagaStep step, SagaTrigger trigger) { }

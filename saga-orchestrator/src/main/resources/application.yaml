@@ -54,7 +54,17 @@ management:
         include: health,info
 
 saga:
-  step-deadline: ${SAGA_STEP_DEADLINE:PT30M}
+  deadlines:
+    reserve: ${SAGA_RESERVE_DEADLINE:PT30S}
+    charge: ${SAGA_CHARGE_DEADLINE:PT60S}
+    confirm: ${SAGA_CONFIRM_DEADLINE:PT30S}
+    compensation: ${SAGA_COMPENSATION_DEADLINE:PT60S}
+  retry-budget: ${SAGA_RETRY_BUDGET:3}
+  retry-backoff: ${SAGA_RETRY_BACKOFF:PT5S}
+  retry-max-backoff: ${SAGA_RETRY_MAX_BACKOFF:PT1M}
+  watchdog:
+    enabled: ${SAGA_WATCHDOG_ENABLED:true}
+    interval-ms: ${SAGA_WATCHDOG_INTERVAL_MS:1000}
 
 outbox:
   poller:

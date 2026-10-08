@@ -11,6 +11,9 @@ import com.deepana.saga.commondto.order.OrderConfirmedEvent;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
+import com.deepana.sagaorchestrator.repository.SagaAdminView;
+
+import java.util.List;
 
 
 public interface SagaService {
@@ -34,4 +37,10 @@ public interface SagaService {
     void handleOrderConfirmed(OrderConfirmedEvent event, String messageId);
 
     void handleOrderCancelled(OrderCancelledEvent event, String messageId);
+
+    List<SagaAdminView> listNeedingAttention();
+
+    void retryNeedsAttention(String sagaId, String action);
+
+    void forceResolve(String sagaId, String operatorNote);
 }

@@ -14,6 +14,7 @@ import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import com.deepana.sagaorchestrator.outbox.OutboxPoller;
 import com.deepana.sagaorchestrator.outbox.OutboxTransactions;
 import com.deepana.sagaorchestrator.service.SagaService;
+import com.deepana.sagaorchestrator.service.SagaServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -44,11 +45,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "outbox.poller.enabled=false")
 class SagaPersistenceIntegrationTest extends IntegrationTestBase {
 
     @Autowired private SagaService sagaService;
+    @Autowired private SagaServiceImpl sagaServiceImpl;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private OutboxPoller outboxPoller;
     @Autowired private OutboxTransactions outboxTransactions;
@@ -77,6 +80,172 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
 
         sagaService.handleOrderConfirmed(confirmed(created, sagaId), messageId());
         assertState(created.getOrderId(), "COMPLETED", "COMPLETED");
+    }
+
+    @Test
+    void reserveTimeoutReleasesInventoryAndCancelsAfterAcknowledgments() {
+        OrderCreatedEvent created = order(1020L);
+        start(created);
+        String sagaId = sagaId(created.getOrderId());
+
+        expireDeadline(sagaId);
+        assertThat(sagaServiceImpl.handleExpiredSagas()).isEqualTo(1);
+        assertState(created.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(1);
+        assertThat(countOutbox("order.cancel.cmd")).isZero();
+
+        sagaService.handleInventoryReleased(released(created, sagaId), messageId());
+        assertThat(countOutbox("order.cancel.cmd")).isEqualTo(1);
+        sagaService.handleOrderCancelled(cancelled(created, sagaId), messageId());
+        assertState(created.getOrderId(), "CANCELLED", "CANCELLED");
+    }
+
+    @Test
+    void chargeTimeoutReleasesAndRefundsAndLatePaymentDoesNotQueueAnotherRefund() {
+        OrderCreatedEvent created = order(1021L);
+        start(created);
+        String sagaId = sagaId(created.getOrderId());
+        sagaService.handleInventoryReserved(reserved(created, sagaId), messageId());
+
+        expireDeadline(sagaId);
+        sagaServiceImpl.handleExpiredSagas();
+        assertState(created.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(1);
+        assertThat(countOutbox("payment.refund.cmd")).isEqualTo(1);
+
+        sagaService.handlePaymentSuccess(paymentSuccess(created, sagaId), messageId());
+        assertThat(countOutbox("payment.refund.cmd")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM saga_step_log WHERE saga_id = ? AND event_type = 'LATE_SUCCESS'
+                """, Long.class, sagaId)).isEqualTo(1);
+        assertState(created.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+    }
+
+    @Test
+    void lateInventoryReservationAfterCompensationIsLoggedAndRejected() {
+        OrderCreatedEvent created = order(1022L);
+        start(created);
+        String sagaId = sagaId(created.getOrderId());
+        expireDeadline(sagaId);
+        sagaServiceImpl.handleExpiredSagas();
+
+        sagaService.handleInventoryReserved(reserved(created, sagaId), messageId());
+
+        assertState(created.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+        assertThat(countOutbox("payment.charge.cmd")).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM saga_step_log
+                WHERE saga_id = ? AND event_type = 'LATE_INVENTORY_RESERVED'
+                """, Long.class, sagaId)).isEqualTo(1);
+    }
+
+    @Test
+    void confirmTimeoutExhaustsRetriesAndAdminRetryAllowsLateConfirmation() {
+        OrderCreatedEvent created = order(1023L);
+        start(created);
+        String sagaId = sagaId(created.getOrderId());
+        sagaService.handleInventoryReserved(reserved(created, sagaId), messageId());
+        sagaService.handlePaymentSuccess(paymentSuccess(created, sagaId), messageId());
+
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            expireDeadline(sagaId);
+            sagaServiceImpl.handleExpiredSagas();
+        }
+        assertState(created.getOrderId(), "ACTIVE", "CONFIRM_ORDER");
+        assertThat(countOutbox("order.confirm.cmd")).isEqualTo(4);
+        expireDeadline(sagaId);
+        sagaServiceImpl.handleExpiredSagas();
+        assertState(created.getOrderId(), "NEEDS_ATTENTION", "CONFIRM_ORDER");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT needs_attention FROM saga_instance WHERE saga_id = ?
+                """, Boolean.class, sagaId)).isTrue();
+
+        sagaService.retryNeedsAttention(sagaId, "CONFIRM");
+        assertState(created.getOrderId(), "ACTIVE", "CONFIRM_ORDER");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT retry_count FROM saga_instance WHERE saga_id = ?
+                """, Integer.class, sagaId)).isZero();
+        sagaService.handleOrderConfirmed(confirmed(created, sagaId), messageId());
+        assertState(created.getOrderId(), "COMPLETED", "COMPLETED");
+    }
+
+    @Test
+    void missingCompensationAcknowledgmentIsRetriedUntilNeedsAttention() {
+        OrderCreatedEvent created = order(1024L);
+        start(created);
+        String sagaId = sagaId(created.getOrderId());
+        expireDeadline(sagaId);
+        sagaServiceImpl.handleExpiredSagas();
+
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            expireDeadline(sagaId);
+            sagaServiceImpl.handleExpiredSagas();
+        }
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(4);
+        expireDeadline(sagaId);
+        sagaServiceImpl.handleExpiredSagas();
+        assertState(created.getOrderId(), "NEEDS_ATTENTION", "CANCEL_ORDER");
+    }
+
+    @Test
+    void adminCanRetryCompensationOrForceResolveAndRejectInvalidActions() {
+        OrderCreatedEvent retry = order(1025L);
+        start(retry);
+        String retrySaga = sagaId(retry.getOrderId());
+        expireDeadline(retrySaga);
+        sagaServiceImpl.handleExpiredSagas();
+        exhaustCompensationRetries(retrySaga);
+        assertState(retry.getOrderId(), "NEEDS_ATTENTION", "CANCEL_ORDER");
+
+        assertThatThrownBy(() -> sagaService.retryNeedsAttention(retrySaga, "CONFIRM"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        sagaService.retryNeedsAttention(retrySaga, "COMPENSATION");
+        assertState(retry.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(5);
+        sagaService.handleInventoryReleased(released(retry, retrySaga), messageId());
+        sagaService.handleOrderCancelled(cancelled(retry, retrySaga), messageId());
+        assertState(retry.getOrderId(), "CANCELLED", "CANCELLED");
+
+        OrderCreatedEvent resolve = order(1026L);
+        start(resolve);
+        String resolveSaga = sagaId(resolve.getOrderId());
+        expireDeadline(resolveSaga);
+        sagaServiceImpl.handleExpiredSagas();
+        exhaustCompensationRetries(resolveSaga);
+        assertThatThrownBy(() -> sagaService.forceResolve(resolveSaga, ""))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        sagaService.forceResolve(resolveSaga, "Operator verified external resolution");
+        assertState(resolve.getOrderId(), "CANCELLED", "CANCELLED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT payload->>'operatorNote' FROM saga_step_log
+                WHERE saga_id = ? AND event_type = 'ADMIN_FORCE_RESOLVE'
+                """, String.class, resolveSaga)).isEqualTo("Operator verified external resolution");
+
+        OrderCreatedEvent active = order(1027L);
+        start(active);
+        assertThatThrownBy(() -> sagaService.retryNeedsAttention(sagaId(active.getOrderId()), "CONFIRM"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
+    @Test
+    void concurrentWatchdogsClaimAnExpiredSagaOnlyOnce() throws Exception {
+        OrderCreatedEvent created = order(1028L);
+        start(created);
+        String sagaId = sagaId(created.getOrderId());
+        expireDeadline(sagaId);
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> first = executor.submit(() -> runWatchdogAfter(start));
+            Future<Integer> second = executor.submit(() -> runWatchdogAfter(start));
+            start.countDown();
+            assertThat(first.get(30, TimeUnit.SECONDS) + second.get(30, TimeUnit.SECONDS)).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(1);
+        assertState(created.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
     }
 
     @Test
@@ -267,6 +436,35 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
 
             new OutboxPoller(outboxTransactions, kafkaTemplate, objectMapper, false, 50, 30_000).pollOnce();
             assertThat(consumer.poll(Duration.ofSeconds(1))).isEmpty();
+        }
+    }
+
+    private void exhaustCompensationRetries(String sagaId) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            expireDeadline(sagaId);
+            sagaServiceImpl.handleExpiredSagas();
+        }
+        expireDeadline(sagaId);
+        sagaServiceImpl.handleExpiredSagas();
+    }
+
+    private void expireDeadline(String sagaId) {
+        jdbcTemplate.update("""
+                UPDATE saga_instance
+                SET deadline_at = clock_timestamp() - interval '1 second'
+                WHERE saga_id = ?
+                """, sagaId);
+    }
+
+    private Integer runWatchdogAfter(CountDownLatch start) {
+        try {
+            if (!start.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timed out waiting to start concurrent watchdogs");
+            }
+            return sagaServiceImpl.handleExpiredSagas();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Concurrent watchdog test interrupted", e);
         }
     }
 

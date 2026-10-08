@@ -22,6 +22,7 @@ import com.deepana.sagaorchestrator.entity.SagaStatus;
 import com.deepana.sagaorchestrator.entity.SagaStep;
 import com.deepana.sagaorchestrator.entity.SagaTransition;
 import com.deepana.sagaorchestrator.kafka.SagaCommandProducer;
+import com.deepana.sagaorchestrator.repository.SagaAdminView;
 import com.deepana.sagaorchestrator.repository.SagaRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,10 +31,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,8 +55,26 @@ public class SagaServiceImpl implements SagaService {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
 
-    @Value("${saga.step-deadline:PT30M}")
-    private Duration stepDeadline;
+    @Value("${saga.deadlines.reserve:PT30S}")
+    private Duration reserveDeadline;
+
+    @Value("${saga.deadlines.charge:PT60S}")
+    private Duration chargeDeadline;
+
+    @Value("${saga.deadlines.confirm:PT30S}")
+    private Duration confirmDeadline;
+
+    @Value("${saga.deadlines.compensation:PT60S}")
+    private Duration compensationDeadline;
+
+    @Value("${saga.retry-budget:3}")
+    private int retryBudget;
+
+    @Value("${saga.retry-backoff:PT5S}")
+    private Duration retryBackoff;
+
+    @Value("${saga.retry-max-backoff:PT1M}")
+    private Duration retryMaxBackoff;
 
     @Override
     @Transactional
@@ -64,7 +87,7 @@ public class SagaServiceImpl implements SagaService {
             String sagaId = UUID.randomUUID().toString();
             if (!sagaRepository.insertSagaIfAbsent(
                     sagaId, event.getOrderId(), SagaStatus.ACTIVE, SagaStep.RESERVE_INVENTORY,
-                    stepDeadline.toMillis())) {
+                    reserveDeadline.toMillis())) {
                 duplicate("order.created", messageId);
                 return;
             }
@@ -88,7 +111,7 @@ public class SagaServiceImpl implements SagaService {
         withTrace(event, () -> processEvent("inventory.reserved", event, messageId,
                 SagaTrigger.INVENTORY_RESERVED, false, (saga, transition) -> {
                     sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(),
-                            stepDeadline.toMillis());
+                            deadlineMillis(transition.status(), transition.step()));
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "inventory.reserved",
                             saga.status(), transition.status(), serialize(event));
 
@@ -106,7 +129,7 @@ public class SagaServiceImpl implements SagaService {
         withTrace(event, () -> processEvent("inventory.failed", event, messageId,
                 SagaTrigger.INVENTORY_FAILED, false, (saga, transition) -> {
                     sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(),
-                            stepDeadline.toMillis());
+                            deadlineMillis(transition.status(), transition.step()));
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "inventory.failed",
                             saga.status(), transition.status(), serialize(event));
 
@@ -125,6 +148,9 @@ public class SagaServiceImpl implements SagaService {
                     }
                     sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "inventory.released",
                             saga.status(), saga.status(), serialize(event));
+                    if (saga.status() == SagaStatus.COMPENSATING) {
+                        sagaRepository.touchDeadline(saga.sagaId(), compensationDeadline.toMillis());
+                    }
                     queueCancelWhenReady(saga);
                 }));
     }
@@ -135,12 +161,14 @@ public class SagaServiceImpl implements SagaService {
         withTrace(event, () -> processEvent("payment.success", event, messageId,
                 SagaTrigger.PAYMENT_SUCCESS, false, (saga, transition) -> {
                     sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(),
-                            stepDeadline.toMillis());
+                            deadlineMillis(transition.status(), transition.step()));
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "payment.success",
                             saga.status(), transition.status(), serialize(event));
 
                     ConfirmOrderCommand command = new ConfirmOrderCommand();
                     copyBaseFields(event, command, saga.sagaId());
+                    sagaRepository.appendStepLog(saga.sagaId(), SagaStep.CONFIRM_ORDER,
+                            "order.confirm.cmd", transition.status(), transition.status(), serialize(command));
                     producer.sendConfirmOrder(command);
                 }));
     }
@@ -151,7 +179,7 @@ public class SagaServiceImpl implements SagaService {
         withTrace(event, () -> processEvent("payment.failed", event, messageId,
                 SagaTrigger.PAYMENT_FAILED, false, (saga, transition) -> {
                     sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(),
-                            stepDeadline.toMillis());
+                            deadlineMillis(transition.status(), transition.step()));
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "payment.failed",
                             saga.status(), transition.status(), serialize(event));
 
@@ -170,6 +198,9 @@ public class SagaServiceImpl implements SagaService {
                     }
                     sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "REFUNDED",
                             saga.status(), saga.status(), serialize(event));
+                    if (saga.status() == SagaStatus.COMPENSATING) {
+                        sagaRepository.touchDeadline(saga.sagaId(), compensationDeadline.toMillis());
+                    }
                     queueCancelWhenReady(saga);
                 }));
     }
@@ -180,7 +211,7 @@ public class SagaServiceImpl implements SagaService {
         withTrace(event, () -> processEvent("order.cancel.requested", event, messageId,
                 SagaTrigger.CANCEL_REQUESTED, true, (saga, transition) -> {
                     sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(),
-                            stepDeadline.toMillis());
+                            deadlineMillis(transition.status(), transition.step()));
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(),
                             "order.cancel.requested", saga.status(), transition.status(), serialize(event));
                     queueInventoryRelease(saga, event);
@@ -213,6 +244,215 @@ public class SagaServiceImpl implements SagaService {
                 }));
     }
 
+    @Transactional
+    public int handleExpiredSagas() {
+        var expired = sagaRepository.findExpiredForUpdate();
+        for (SagaSnapshot saga : expired) {
+            if (saga.status() == SagaStatus.ACTIVE) {
+                handleActiveTimeout(saga);
+            } else {
+                handleCompensationTimeout(saga);
+            }
+        }
+        return expired.size();
+    }
+
+    @Override
+    public List<SagaAdminView> listNeedingAttention() {
+        return sagaRepository.findNeedingAttention();
+    }
+
+    @Override
+    @Transactional
+    public void retryNeedsAttention(String sagaId, String action) {
+        SagaSnapshot saga = sagaRepository.findBySagaIdForUpdate(sagaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Saga not found"));
+        SagaTrigger trigger = switch (action) {
+            case "CONFIRM" -> SagaTrigger.ADMIN_RETRY_CONFIRM;
+            case "COMPENSATION" -> SagaTrigger.ADMIN_RETRY_COMPENSATION;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported retry action");
+        };
+        SagaTransition transition = stateMachine.transition(saga, trigger)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Retry action is not valid for this saga state and step"));
+
+        boolean releasePending = isPending(saga.sagaId(), "inventory.release.cmd", "inventory.released");
+        boolean refundPending = isPending(saga.sagaId(), "payment.refund.cmd", "REFUNDED");
+        boolean cancelPending = isPending(saga.sagaId(), "order.cancel.cmd", "order.cancelled");
+        if (trigger == SagaTrigger.ADMIN_RETRY_COMPENSATION
+                && !releasePending && !refundPending && !cancelPending) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "No outstanding compensation command can be retried");
+        }
+
+        long deadline = deadlineMillis(transition.status(), transition.step());
+        sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(), deadline);
+        sagaRepository.appendStepLog(saga.sagaId(), transition.step(),
+                trigger == SagaTrigger.ADMIN_RETRY_CONFIRM ? "ADMIN_RETRY_CONFIRM" : "ADMIN_RETRY_COMPENSATION",
+                saga.status(), transition.status(), serialize(Map.of("action", action)));
+
+        OrderCreatedEvent order = originalOrder(saga.sagaId());
+        if (trigger == SagaTrigger.ADMIN_RETRY_CONFIRM) {
+            sendConfirm(order, saga.sagaId(), SagaStatus.ACTIVE, "order.confirm.cmd");
+        } else {
+            SagaSnapshot retrying = withState(saga, transition.status(), transition.step());
+            if (releasePending) {
+                resendInventoryRelease(retrying, order);
+            }
+            if (refundPending) {
+                resendPaymentRefund(retrying, order);
+            }
+            if (cancelPending) {
+                resendCancelOrder(retrying, order);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void forceResolve(String sagaId, String operatorNote) {
+        if (operatorNote == null || operatorNote.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "operatorNote is required");
+        }
+        SagaSnapshot saga = sagaRepository.findBySagaIdForUpdate(sagaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Saga not found"));
+        SagaTransition transition = stateMachine.transition(saga, SagaTrigger.ADMIN_FORCE_RESOLVE)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Saga is not in NEEDS_ATTENTION"));
+        sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(), 0);
+        sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "ADMIN_FORCE_RESOLVE",
+                saga.status(), transition.status(), serialize(Map.of("operatorNote", operatorNote)));
+    }
+
+    private void handleActiveTimeout(SagaSnapshot saga) {
+        switch (saga.currentStep()) {
+            case RESERVE_INVENTORY, CHARGE_PAYMENT -> {
+                sagaRepository.updateState(saga.sagaId(), SagaStatus.COMPENSATING,
+                        SagaStep.CANCEL_ORDER, compensationDeadline.toMillis());
+                sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(),
+                        "STEP_TIMEOUT", saga.status(), SagaStatus.COMPENSATING,
+                        serialize(Map.of("timedOutStep", saga.currentStep().name())));
+                SagaSnapshot compensating = withState(saga, SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER);
+                OrderCreatedEvent order = originalOrder(saga.sagaId());
+                queueInventoryRelease(compensating, order);
+                if (saga.currentStep() == SagaStep.CHARGE_PAYMENT) {
+                    queuePaymentRefund(compensating, order);
+                }
+            }
+            case CONFIRM_ORDER -> {
+                if (saga.retryCount() >= retryBudget) {
+                    exhaustRetryBudget(saga);
+                    return;
+                }
+                sagaRepository.scheduleRetry(saga.sagaId(), retryDelayMillis(saga.retryCount()));
+                sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(),
+                        "WATCHDOG_RETRY_CONFIRM", saga.status(), saga.status(),
+                        serialize(Map.of("retryCount", saga.retryCount() + 1)));
+                sendConfirm(originalOrder(saga.sagaId()), saga.sagaId(), saga.status(),
+                        "order.confirm.retry");
+            }
+            default -> throw new IllegalStateException(
+                    "Active saga has no timeout policy for step " + saga.currentStep());
+        }
+    }
+
+    private void handleCompensationTimeout(SagaSnapshot saga) {
+        boolean releasePending = isPending(saga.sagaId(), "inventory.release.cmd", "inventory.released");
+        boolean refundPending = isPending(saga.sagaId(), "payment.refund.cmd", "REFUNDED");
+        boolean cancelPending = isPending(saga.sagaId(), "order.cancel.cmd", "order.cancelled");
+        if (!releasePending && !refundPending && !cancelPending) {
+            throw new IllegalStateException(
+                    "Expired compensating saga has no outstanding command: " + saga.sagaId());
+        }
+        if (saga.retryCount() >= retryBudget) {
+            exhaustRetryBudget(saga);
+            return;
+        }
+
+        sagaRepository.scheduleRetry(saga.sagaId(), retryDelayMillis(saga.retryCount()));
+        sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(),
+                "WATCHDOG_RETRY_COMPENSATION", saga.status(), saga.status(),
+                serialize(Map.of("retryCount", saga.retryCount() + 1)));
+        OrderCreatedEvent order = originalOrder(saga.sagaId());
+        if (releasePending) {
+            resendInventoryRelease(saga, order);
+        }
+        if (refundPending) {
+            resendPaymentRefund(saga, order);
+        }
+        if (cancelPending) {
+            resendCancelOrder(saga, order);
+        }
+    }
+
+    private void exhaustRetryBudget(SagaSnapshot saga) {
+        sagaRepository.markNeedsAttention(saga.sagaId());
+        sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(),
+                "RETRY_BUDGET_EXHAUSTED", saga.status(), SagaStatus.NEEDS_ATTENTION,
+                serialize(Map.of("retryCount", saga.retryCount(), "retryBudget", retryBudget)));
+    }
+
+    private void sendConfirm(OrderCreatedEvent order, String sagaId, SagaStatus status, String eventType) {
+        ConfirmOrderCommand command = new ConfirmOrderCommand();
+        copyBaseFields(order, command, sagaId);
+        sagaRepository.appendStepLog(sagaId, SagaStep.CONFIRM_ORDER, eventType,
+                status, status, serialize(command));
+        producer.sendConfirmOrder(command);
+    }
+
+    private void resendInventoryRelease(SagaSnapshot saga, OrderCreatedEvent order) {
+        ReleaseInventoryCommand command = new ReleaseInventoryCommand();
+        copyBaseFields(order, command, saga.sagaId());
+        command.setItems(order.getItems());
+        sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "inventory.release.retry",
+                saga.status(), saga.status(), serialize(command));
+        producer.sendReleaseInventory(command);
+    }
+
+    private void resendPaymentRefund(SagaSnapshot saga, OrderCreatedEvent order) {
+        RefundPaymentCommand command = new RefundPaymentCommand();
+        copyBaseFields(order, command, saga.sagaId());
+        command.setTotalAmount(order.getTotalAmount());
+        command.setReason("Compensation for saga " + saga.sagaId());
+        sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "payment.refund.retry",
+                saga.status(), saga.status(), serialize(command));
+        producer.sendRefundPayment(command);
+    }
+
+    private void resendCancelOrder(SagaSnapshot saga, OrderCreatedEvent order) {
+        CancelOrderCommand command = cancelCommand(order, saga.sagaId(), "SAGA_COMPENSATED");
+        sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "order.cancel.retry",
+                saga.status(), saga.status(), serialize(command));
+        producer.sendCancelOrder(command);
+    }
+
+    private boolean isPending(String sagaId, String command, String acknowledgment) {
+        return sagaRepository.hasStepEvent(sagaId, command)
+                && !sagaRepository.hasStepEvent(sagaId, acknowledgment);
+    }
+
+    private long deadlineMillis(SagaStatus status, SagaStep step) {
+        if (status == SagaStatus.ACTIVE) {
+            return switch (step) {
+                case RESERVE_INVENTORY -> reserveDeadline.toMillis();
+                case CHARGE_PAYMENT -> chargeDeadline.toMillis();
+                case CONFIRM_ORDER -> confirmDeadline.toMillis();
+                default -> 0;
+            };
+        }
+        return status == SagaStatus.COMPENSATING ? compensationDeadline.toMillis() : 0;
+    }
+
+    private long retryDelayMillis(int retriesAlreadyAttempted) {
+        long multiplier = 1L << Math.min(retriesAlreadyAttempted, 30);
+        return Math.min(retryBackoff.multipliedBy(multiplier).toMillis(), retryMaxBackoff.toMillis());
+    }
+
+    private SagaSnapshot withState(SagaSnapshot saga, SagaStatus status, SagaStep step) {
+        return new SagaSnapshot(saga.sagaId(), saga.orderId(), status, step, saga.version(),
+                saga.deadlineAt(), saga.lastHeartbeatAt(), saga.retryCount(), status == SagaStatus.NEEDS_ATTENTION);
+    }
+
     private void processEvent(String eventType, BaseEvent event, String messageId,
                               SagaTrigger trigger, boolean locateByOrderId, TransitionAction action) {
         if (!markMessageProcessed(eventType, messageId)) {
@@ -233,6 +473,14 @@ public class SagaServiceImpl implements SagaService {
             return;
         }
         SagaSnapshot saga = found.get();
+
+        if ("inventory.reserved".equals(eventType)
+                && (saga.status() == SagaStatus.COMPENSATING || saga.status() == SagaStatus.CANCELLED)) {
+            sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "LATE_INVENTORY_RESERVED",
+                    saga.status(), saga.status(), serialize(event));
+            invalid(eventType, "reservation arrived after compensation started");
+            return;
+        }
 
         if ("payment.success".equals(eventType)
                 && (saga.status() == SagaStatus.COMPENSATING || saga.status() == SagaStatus.CANCELLED)) {

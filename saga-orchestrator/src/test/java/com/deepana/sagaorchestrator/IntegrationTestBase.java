@@ -33,5 +33,6 @@ public abstract class IntegrationTestBase {
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         registry.add("spring.kafka.listener.ack-mode", () -> "record");
         registry.add("outbox.poller.enabled", () -> false);
+        registry.add("saga.watchdog.enabled", () -> false);
     }
 }

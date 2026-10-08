@@ -41,6 +41,15 @@ public class SagaInstance {
     @Column(name = "deadline_at")
     private Instant deadlineAt;
 
+    @Column(name = "last_heartbeat_at", nullable = false)
+    private Instant lastHeartbeatAt;
+
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount;
+
+    @Column(name = "needs_attention", nullable = false)
+    private boolean needsAttention;
+
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
 

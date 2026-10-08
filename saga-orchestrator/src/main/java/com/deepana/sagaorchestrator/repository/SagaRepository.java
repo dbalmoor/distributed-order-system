@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
@@ -20,36 +21,59 @@ public class SagaRepository {
                                       SagaStep step, long deadlineMillis) {
         return jdbcTemplate.update("""
                 INSERT INTO saga_instance
-                    (saga_id, order_id, status, current_step, deadline_at, started_at, updated_at)
-                VALUES (?, ?, ?, ?, now() + (? * interval '1 millisecond'), now(), now())
+                    (saga_id, order_id, status, current_step, deadline_at,
+                     last_heartbeat_at, started_at, updated_at)
+                VALUES (?, ?, ?, ?, now() + (? * interval '1 millisecond'), now(), now(), now())
                 ON CONFLICT (order_id) DO NOTHING
                 """, sagaId, orderId, status.name(), step.name(), deadlineMillis) == 1;
     }
 
     public Optional<SagaSnapshot> findBySagaIdForUpdate(String sagaId) {
         return jdbcTemplate.query("""
-                SELECT saga_id, order_id, status, current_step, version
+                SELECT saga_id, order_id, status, current_step, version, deadline_at,
+                       last_heartbeat_at, retry_count, needs_attention
                 FROM saga_instance WHERE saga_id = ? FOR UPDATE
-                """, (rs, row) -> new SagaSnapshot(
-                        rs.getString("saga_id"),
-                        rs.getLong("order_id"),
-                        SagaStatus.valueOf(rs.getString("status")),
-                        SagaStep.valueOf(rs.getString("current_step")),
-                        rs.getLong("version")),
+                """, (rs, row) -> snapshot(rs),
                 sagaId).stream().findFirst();
     }
 
     public Optional<SagaSnapshot> findByOrderIdForUpdate(Long orderId) {
         return jdbcTemplate.query("""
-                SELECT saga_id, order_id, status, current_step, version
+                SELECT saga_id, order_id, status, current_step, version, deadline_at,
+                       last_heartbeat_at, retry_count, needs_attention
                 FROM saga_instance WHERE order_id = ? FOR UPDATE
-                """, (rs, row) -> new SagaSnapshot(
-                        rs.getString("saga_id"),
-                        rs.getLong("order_id"),
-                        SagaStatus.valueOf(rs.getString("status")),
-                        SagaStep.valueOf(rs.getString("current_step")),
-                        rs.getLong("version")),
+                """, (rs, row) -> snapshot(rs),
                 orderId).stream().findFirst();
+    }
+
+    public List<SagaSnapshot> findExpiredForUpdate() {
+        return jdbcTemplate.query("""
+                SELECT saga_id, order_id, status, current_step, version, deadline_at,
+                       last_heartbeat_at, retry_count, needs_attention
+                FROM saga_instance
+                WHERE status IN ('ACTIVE', 'COMPENSATING')
+                  AND needs_attention = FALSE
+                  AND deadline_at < now()
+                ORDER BY deadline_at, id
+                LIMIT 100
+                FOR UPDATE SKIP LOCKED
+                """, (rs, row) -> snapshot(rs));
+    }
+
+    public List<SagaAdminView> findNeedingAttention() {
+        return jdbcTemplate.query("""
+                SELECT saga_id, order_id, current_step, retry_count, deadline_at,
+                       last_heartbeat_at
+                FROM saga_instance
+                WHERE status = 'NEEDS_ATTENTION' AND needs_attention = TRUE
+                ORDER BY updated_at, id
+                """, (rs, row) -> new SagaAdminView(
+                rs.getString("saga_id"),
+                rs.getLong("order_id"),
+                SagaStep.valueOf(rs.getString("current_step")),
+                rs.getInt("retry_count"),
+                rs.getTimestamp("deadline_at") == null ? null : rs.getTimestamp("deadline_at").toInstant(),
+                rs.getTimestamp("last_heartbeat_at").toInstant()));
     }
 
     public void updateState(String sagaId, SagaStatus status, SagaStep step, long deadlineMillis) {
@@ -57,12 +81,34 @@ public class SagaRepository {
                 UPDATE saga_instance
                 SET status = ?, current_step = ?,
                     deadline_at = CASE WHEN ? THEN now() + (? * interval '1 millisecond') ELSE NULL END,
+                    last_heartbeat_at = now(), retry_count = 0, needs_attention = ?,
                     updated_at = now(), version = version + 1
                 WHERE saga_id = ?
                 """,
-                status.name(), step.name(), isActive(status), deadlineMillis, sagaId);
+                status.name(), step.name(), isActive(status), deadlineMillis,
+                status == SagaStatus.NEEDS_ATTENTION, sagaId);
         if (updated != 1) {
             throw new IllegalStateException("Saga disappeared during transition: " + sagaId);
+        }
+    }
+
+    public void scheduleRetry(String sagaId, long deadlineMillis) {
+        updateRetry(sagaId, deadlineMillis, true);
+    }
+
+    public void touchDeadline(String sagaId, long deadlineMillis) {
+        updateRetry(sagaId, deadlineMillis, false);
+    }
+
+    public void markNeedsAttention(String sagaId) {
+        int updated = jdbcTemplate.update("""
+                UPDATE saga_instance
+                SET status = 'NEEDS_ATTENTION', needs_attention = TRUE, deadline_at = NULL,
+                    last_heartbeat_at = now(), updated_at = now(), version = version + 1
+                WHERE saga_id = ? AND status IN ('ACTIVE', 'COMPENSATING')
+                """, sagaId);
+        if (updated != 1) {
+            throw new IllegalStateException("Saga is no longer eligible for attention: " + sagaId);
         }
     }
 
@@ -106,5 +152,31 @@ public class SagaRepository {
 
     private boolean isActive(SagaStatus status) {
         return status == SagaStatus.ACTIVE || status == SagaStatus.COMPENSATING;
+    }
+
+    private void updateRetry(String sagaId, long deadlineMillis, boolean increment) {
+        int updated = jdbcTemplate.update("""
+                UPDATE saga_instance
+                SET deadline_at = now() + (? * interval '1 millisecond'),
+                    retry_count = retry_count + ?, last_heartbeat_at = now(),
+                    updated_at = now(), version = version + 1
+                WHERE saga_id = ? AND status IN ('ACTIVE', 'COMPENSATING')
+                """, deadlineMillis, increment ? 1 : 0, sagaId);
+        if (updated != 1) {
+            throw new IllegalStateException("Saga disappeared during retry scheduling: " + sagaId);
+        }
+    }
+
+    private SagaSnapshot snapshot(java.sql.ResultSet rs) throws java.sql.SQLException {
+        return new SagaSnapshot(
+                rs.getString("saga_id"),
+                rs.getLong("order_id"),
+                SagaStatus.valueOf(rs.getString("status")),
+                SagaStep.valueOf(rs.getString("current_step")),
+                rs.getLong("version"),
+                rs.getTimestamp("deadline_at") == null ? null : rs.getTimestamp("deadline_at").toInstant(),
+                rs.getTimestamp("last_heartbeat_at").toInstant(),
+                rs.getInt("retry_count"),
+                rs.getBoolean("needs_attention"));
     }
 }
