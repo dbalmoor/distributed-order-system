@@ -1,40 +1,24 @@
 # Distributed Order Management System
 
-Saga orchestration with Spring Boot, Kafka and PostgreSQL, built for correctness under failure.
+Event-driven order processing with a **persisted Saga orchestrator**, **transactional outbox**, and **idempotent consumers** on Spring Boot and Kafka. Built to explore what it takes to keep distributed workflows correct when messages are duplicated, delayed, reordered, or lost.
 
 ![Java](https://img.shields.io/badge/Java-17-orange)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.5-brightgreen)
-![Kafka](https://img.shields.io/badge/Apache-Kafka-black)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-blue)
-![Pattern](https://img.shields.io/badge/Pattern-Saga%20Orchestration-purple)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.5-green)
+![Kafka](https://img.shields.io/badge/Apache%20Kafka-KRaft-black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Flyway-blue)
+<!-- TODO: add a CI badge once GitHub Actions runs `mvn -B verify` -->
 
-## Overview
+> This is a learning and portfolio project. Payment is a deterministic simulation, and several production concerns (auth, metrics, real tracing) are intentionally not built yet. See [Known limitations](#known-limitations).
 
-An order is placed through REST and then moves through inventory reservation, payment and confirmation. Each step lives in a separate service with its own database. There is no distributed transaction. A saga orchestrator coordinates the steps and runs compensating actions when something fails.
+---
 
-The guarantees:
+## What it does
 
-- **At-least-once delivery with idempotent effects.** Exactly-once is not claimed.
-- **No lost messages.** State changes and outgoing messages are committed together through a transactional outbox.
-- **No duplicate business effects.** Every consumer is idempotent by a natural key or message id.
-- **A single writer for order status.** The orchestrator decides by emitting commands; `order-service` is the only service that writes the status.
-- **Recoverable orchestration.** Saga state is persisted, so the orchestrator resumes after a restart.
+A client places an order. The system reserves inventory, charges payment, and confirms the order, each step owned by a separate service with its own database. If any step fails, times out, or is cancelled, the orchestrator compensates in the right order and leaves the order in a consistent final state.
 
-The as-built architecture is described in [`design.md`](design.md). Pending
-requirements and future work are tracked separately in [`requirement.md`](requirement.md).
-
-## Services
-
-| Module | Responsibility |
-|---|---|
-| `order-service` | Order REST API and the order state machine. Changes status only on `order.confirm.cmd` / `order.cancel.cmd`. |
-| `inventory-service` | Pessimistically locked stock reservation and conditional stock release, with idempotency markers. |
-| `payment-service` | Idempotent charge and refund, keyed by `(saga_id, type)`. |
-| `saga-orchestrator` | Persistent saga state, state machine, compensation, watchdog and admin recovery API. |
-| `gateway-service` | API routing. Currently `permitAll` (see Known limitations). |
-| `common-dto` | Shared command and event contracts. |
-
-Each DB-owning service has its own PostgreSQL database with Flyway migrations (`ddl-auto=validate`). Every service that publishes to Kafka has its own outbox table and poller.
+- No distributed (2PC) transactions: consistency comes from a saga plus local transactions.
+- Delivery is **at-least-once**. Every consumer is safe against duplicates and late events.
+- Stuck workflows are detected and recovered automatically, and escalated to an operator when automatic recovery is exhausted.
 
 ## Architecture
 
@@ -42,123 +26,119 @@ Each DB-owning service has its own PostgreSQL database with Flyway migrations (`
 flowchart LR
     Client --> Gateway[gateway-service]
     Gateway --> Order[order-service]
-    Order --> OrderDB[(Order DB + outbox)]
-    Orch[saga-orchestrator] --> SagaDB[(Saga DB + outbox)]
-    Inv[inventory-service] --> InvDB[(Inventory DB + outbox)]
-    Pay[payment-service] --> PayDB[(Payment DB + outbox)]
-    OrderDB -. poller .-> Kafka[(Kafka)]
-    SagaDB -. poller .-> Kafka
-    InvDB -. poller .-> Kafka
-    PayDB -. poller .-> Kafka
+    Order --> OrderDB[(Order PostgreSQL)]
+    Orchestrator[saga-orchestrator] --> SagaDB[(Saga PostgreSQL)]
+    Inventory[inventory-service] --> InventoryDB[(Inventory PostgreSQL)]
+    Payment[payment-service] --> PaymentDB[(Payment PostgreSQL)]
+    OrderDB -. outbox poller .-> Kafka[(Kafka)]
+    SagaDB -. outbox poller .-> Kafka
+    InventoryDB -. outbox poller .-> Kafka
+    PaymentDB -. outbox poller .-> Kafka
     Kafka --> Order
-    Kafka --> Orch
-    Kafka --> Inv
-    Kafka --> Pay
+    Kafka --> Orchestrator
+    Kafka --> Inventory
+    Kafka --> Payment
 ```
 
-Each business write and its outbox row are committed in one transaction. A poller then publishes the row to Kafka after the commit.
+| Module | Responsibility |
+|---|---|
+| `order-service` | Creates and reads orders, records cancellation requests, applies confirm/cancel commands. The only writer of order status. |
+| `inventory-service` | Reserves and releases stock; records processed events. |
+| `payment-service` | Simulated charge and refund, protected by an idempotency key. |
+| `saga-orchestrator` | Persists saga state, advances the workflow, runs compensation, timeouts, and operator recovery. |
+| `gateway-service` | Routes client traffic to services (currently unauthenticated, see limitations). |
+| `common-dto` | Shared Kafka command and event payloads. |
+
+Each service that owns data has its own PostgreSQL database and Flyway migrations. JPA runs in `validate` mode only.
 
 ## Happy path
 
 ```mermaid
 sequenceDiagram
-    participant C as Client
-    participant O as order-service
-    participant S as saga-orchestrator
-    participant I as inventory-service
-    participant P as payment-service
-    C->>O: POST /orders
-    O-->>C: 202 (orderId)
-    O->>S: order.created
-    S->>I: inventory.reserve.cmd
-    I->>S: inventory.reserved
-    S->>P: payment.charge.cmd
-    P->>S: payment.success
-    Note over S: payment.success is the pivot
-    S->>O: order.confirm.cmd
-    O->>S: order.confirmed
-    Note over S: saga COMPLETED
+    participant Client
+    participant Order as order-service
+    participant Saga as saga-orchestrator
+    participant Inventory as inventory-service
+    participant Payment as payment-service
+    Client->>Order: POST /orders
+    Order-->>Client: 202 + order id
+    Order->>Saga: order.created
+    Saga->>Inventory: inventory.reserve.cmd
+    Inventory->>Saga: inventory.reserved
+    Saga->>Payment: payment.charge.cmd
+    Payment->>Saga: payment.success
+    Note over Saga: Payment success is the pivot
+    Saga->>Order: order.confirm.cmd
+    Order->>Saga: order.confirmed
+    Note over Saga: COMPLETED
 ```
 
-## Compensation
+`POST /orders` returns `202 Accepted`; clients read the outcome through the order REST API.
 
-Payment failure releases the reserved stock first, and only then cancels the order:
+## Failure handling
 
-```mermaid
-sequenceDiagram
-    participant O as order-service
-    participant S as saga-orchestrator
-    participant I as inventory-service
-    participant P as payment-service
-    P->>S: payment.failed
-    S->>I: inventory.release.cmd
-    I->>S: inventory.released
-    S->>O: order.cancel.cmd
-    O->>S: order.cancelled
-    Note over S: saga CANCELLED
-```
+Payment success is the **pivot**. Before it, a failure, timeout, or accepted cancellation triggers compensation. After it, the saga only moves forward and retries confirmation.
 
-Other cases:
+| Scenario | Behaviour |
+|---|---|
+| Inventory fails | Order is cancelled; no release is needed because nothing was reserved. |
+| Payment fails | `inventory.release.cmd` is sent; the order is cancelled only after `inventory.released`. |
+| Charge times out | Outcome is unknown, so the orchestrator sends both release and refund before cancelling. |
+| Confirm times out | Past the pivot: resend `order.confirm.cmd` with backoff. Never compensates. |
+| Compensation ack missing | The missing compensation command is resent with backoff. |
+| Retry budget exhausted | Saga moves to `NEEDS_ATTENTION` for an operator. |
+| Release arrives before reserve | Inventory stores a `RELEASED` marker, so the late reserve has no effect. |
+| Refund arrives before charge | Payment stores a `REFUNDED` marker, so the late charge has no effect. |
+| Late `payment.success` during compensation | At most one refund is issued. |
+| Late `inventory.reserved` after compensation starts | Payment is not triggered. |
+| Duplicate or invalid-for-state events | Recorded and rejected; no additional business effect. |
 
-- **Inventory failure.** Reservation is all-or-nothing, so there is nothing to release. The saga goes straight to `order.cancel.cmd`.
-- **Cancel request before the pivot.** The saga sends the needed release (and refund, if a charge was in flight). It cancels the order only after both acknowledgements arrive.
-- **Cancel request after the pivot.** Rejected. The order completes.
-- **Late `payment.success` after compensation.** The event is recorded as `LATE_SUCCESS` in `saga_step_log`; at most one `payment.refund.cmd` is sent. A saga still waiting for compensation acknowledgements remains `COMPENSATING` until cancellation can complete.
-- **Late `inventory.reserved` after compensation.** Rejected with no side effects, then counted and logged.
-- **Release before reserve, refund before charge.** A `RELEASED` or `REFUNDED` marker makes the later reserve or charge fail, so nothing is held or charged.
+The scenario-level coverage is tracked in the [failure matrix](docs/failure-matrix.md).
 
-## State machines
-
-### Order
-
-```mermaid
-stateDiagram-v2
-    [*] --> CREATED
-    CREATED --> COMPLETED: order.confirm.cmd
-    CREATED --> CANCELLED: order.cancel.cmd
-    COMPLETED --> [*]
-    CANCELLED --> [*]
-```
-
-`CREATED` is shown to clients as `PENDING`. A repeated command that matches the current terminal state is a logged no-op. A conflicting command is rejected and logged.
-
-### Saga
+### Saga state machine
 
 ```mermaid
 stateDiagram-v2
     [*] --> ACTIVE
     ACTIVE --> COMPLETED: order.confirmed
-    ACTIVE --> COMPENSATING: failure, step timeout, accepted cancel
-    COMPENSATING --> CANCELLED: order.cancelled
+    ACTIVE --> COMPENSATING: failure, accepted cancel, or pre-pivot timeout
+    COMPENSATING --> CANCELLED: required compensation acknowledgements
     ACTIVE --> NEEDS_ATTENTION: confirm retry budget exhausted
     COMPENSATING --> NEEDS_ATTENTION: compensation retry budget exhausted
-    NEEDS_ATTENTION --> ACTIVE: admin retry of confirm
-    NEEDS_ATTENTION --> COMPENSATING: admin retry of compensation
-    NEEDS_ATTENTION --> CANCELLED: admin force-resolve
+    NEEDS_ATTENTION --> ACTIVE: operator retries confirm
+    NEEDS_ATTENTION --> COMPENSATING: operator retries compensation
+    NEEDS_ATTENTION --> CANCELLED: operator force-resolves
     COMPLETED --> [*]
     CANCELLED --> [*]
 ```
 
-`NEEDS_ATTENTION` is a non-terminal recovery state. A normal timeout never ends there. It is used only when a confirm or compensation step cannot be acknowledged within its retry budget.
+## Reliability design
 
-## Reliability mechanisms
+**Transactional outbox.** Each service writes its state change and its outgoing message in one database transaction. A poller claims rows with `FOR UPDATE SKIP LOCKED` and a lease, publishes to Kafka, then records success or failure. This avoids the dual-write problem. Delivery is at-least-once, not exactly-once.
 
-| Concern | Mechanism |
+**Idempotent consumers.**
+- Payment: unique `(saga_id, type)` key; duplicate charge/refund requests return the stored outcome.
+- Inventory: processed-event records plus the `RELEASED` marker.
+- Orchestrator: `processed_message` table (consumer + message id) and row locks while handling an event; an optimistic version column is an additional check.
+
+**Kafka.**
+- Records are keyed by `orderId`, so one order's events stay in sequence while different orders run in parallel across 6 partitions.
+- Producers use `acks=all` with idempotence enabled.
+- Listeners use Spring Kafka retry topics (`<topic>-retry-N`) with bounded attempts and dead-letter topics (`<topic>-dlt`).
+- Each service exposes `POST /admin/kafka/dlt/replay` (topic, partition, offset, dry-run) to republish a dead-lettered record after a fix.
+
+**Stuck-saga watchdog.** `SagaWatchdog` finds expired `ACTIVE` or `COMPENSATING` sagas using `FOR UPDATE SKIP LOCKED`, so multiple instances can run safely. Every transition sets a deadline for the next step.
+
+| Step | Default deadline |
 |---|---|
-| Lost messages | Transactional outbox in every publishing service. The poller claims rows with `FOR UPDATE SKIP LOCKED` and a lease, publishes outside the claim transaction, then marks the row `PUBLISHED` or `FAILED`. |
-| Ordering | Kafka key is `orderId` on every topic. The poller processes one aggregate's rows in `created_at` order and a failed row blocks later rows of that aggregate. |
-| Producer safety | `acks=all`, `enable.idempotence=true`, bounded retries. |
-| Duplicate payment | `UNIQUE(saga_id, type)` with `INSERT ... ON CONFLICT DO NOTHING`. A repeat re-emits the stored outcome. |
-| Duplicate inventory | `processed_inventory_events` with `UNIQUE(saga_id, event_type)` and the release-before-reserve `RELEASED` marker. Reservation currently uses a pessimistic row lock and availability check; see [Design items not yet implemented](#design-items-not-yet-implemented). |
-| Duplicate at orchestrator | `processed_message` table keyed by `(consumer_name, message_id)`. |
-| Concurrent events for one saga | Each handler locks the saga row with `SELECT ... FOR UPDATE`. `version` is a safety net. |
-| Crash recovery | Saga state, step log and outbox are persisted. The orchestrator resumes from the last durable step. |
-| Stuck sagas | A watchdog scans overdue sagas. Each step has a configurable deadline. A reservation is valid only until the saga deadline. |
-| Transient failures and poison messages | Listeners use bounded `@RetryableTopic` retries for configured transient errors. Permanent/unlisted errors route to a DLT. Each service exposes an operator replay endpoint. |
+| Inventory reservation | 30 s |
+| Payment | 60 s |
+| Order confirmation | 30 s |
+| Compensation | 60 s |
 
-## Kafka topics
+Saga state, audit log (`saga_step_log`), and outgoing outbox messages are written in the same transaction.
 
-All topics use `orderId` as the key and 6 partitions. Retry and DLT topics follow `@RetryableTopic` naming (`<topic>-retry-N`, `<topic>-dlt`).
+### Kafka topics
 
 | Topic | Producer | Consumer |
 |---|---|---|
@@ -179,102 +159,92 @@ All topics use `orderId` as the key and 6 partitions. Retry and DLT topics follo
 | `payment.failed` | payment-service | saga-orchestrator |
 | `payment.refunded` | payment-service | saga-orchestrator |
 
-Message headers: `messageId`, `sagaId`, `orderId`, `traceId`, `eventType`. `sagaId` is a String UUID everywhere.
+Messages carry `messageId`, `sagaId`, `orderId`, and `traceId`.
 
-## Failure matrix
+## Operator APIs
 
-The [failure matrix](docs/failure-matrix.md) maps scenarios to the automated test method that proves them. Rows marked `NO TEST` identify design scenarios without direct automated coverage.
+Served directly by `saga-orchestrator` (not routed through the gateway):
 
-## Running locally
+| Method and path | Purpose |
+|---|---|
+| `GET /admin/sagas/needs-attention` | List sagas awaiting operator action. |
+| `POST /admin/sagas/{sagaId}/retry` | Retry `CONFIRM` or `COMPENSATION`; resets the retry budget. |
+| `POST /admin/sagas/{sagaId}/force-resolve` | Resolve to `CANCELLED`; requires an operator note. |
 
-Prerequisites: JDK 17, Maven, Docker.
+Every operator action is recorded in `saga_step_log`.
+
+## Getting started
+
+**Prerequisites:** Java 17, Maven, Docker.
 
 ```bash
-cp .env.example .env        # adjust ports and credentials if needed
-docker compose up -d        # Kafka (KRaft) and one PostgreSQL per service
-mvn -B verify               # builds every module and runs all tests
-```
+# 1. Start Kafka (KRaft) and the service databases
+docker compose -f docker-compose-kafka.yml up -d   # TODO: confirm file name / command
 
-Then start each service from your IDE or with `mvn -pl <module> spring-boot:run`.
+# 2. Build and run all tests (Testcontainers needs Docker running)
+mvn -B verify
+
+# 3. Run each service in its own terminal
+mvn -pl order-service spring-boot:run
+mvn -pl inventory-service spring-boot:run
+mvn -pl payment-service spring-boot:run
+mvn -pl saga-orchestrator spring-boot:run
+```
 
 Create an order:
 
-```http
-POST /orders
-GET  /orders/{id}
-PUT  /orders/{id}/cancel
+```bash
+# TODO: replace with your real request body and port
+curl -X POST http://localhost:8080/orders \
+  -H "Content-Type: application/json" \
+  -d '{ "...": "..." }'
 ```
 
-- `POST /orders` returns `202` with the order id. Poll `GET /orders/{id}` for the outcome.
-- `PUT /orders/{id}/cancel` does not change the status itself. It records a cancel request that the orchestrator accepts only before the payment pivot. It returns `202`, and the outcome is visible through `GET /orders/{id}`.
-
-Payment is a deterministic simulation. Set the configured failure threshold (`PAYMENT_FAIL_AMOUNT_THRESHOLD`) to trigger payment failures. With nothing configured, every charge succeeds.
-
-The orchestrator exposes `GET /admin/sagas/needs-attention`, `POST /admin/sagas/{sagaId}/retry`, and `POST /admin/sagas/{sagaId}/force-resolve`. Each service exposes `POST /admin/kafka/dlt/replay`, accepting a DLT topic, partition, offset, and dry-run option. Admin and DLT replay endpoints are unauthenticated and are not routed through the gateway; do not expose service ports publicly.
+The response is `202` with an order id. Poll `GET /orders/{id}` for the result (`CREATED` is shown as `PENDING`).
 
 ## Testing
 
-- Unit tests cover the order and saga state machines, including valid, no-op and rejected transitions.
-- Integration tests use Testcontainers (Kafka and PostgreSQL) through a shared `IntegrationTestBase` per service. They cover business idempotency, outbox rollback/recovery/concurrent pollers, saga persistence, compensation and watchdog timeouts. Startup tests assert retry-listener configuration, consumer groups and topic/partition creation. There are no end-to-end tests for transient retry delivery, poison-to-DLT routing, or replay behavior yet; see the [failure matrix](docs/failure-matrix.md).
-- Docker must be running. CI runs `mvn -B verify` on GitHub Actions.
+`mvn -B verify` runs unit and integration tests. Integration tests use **Testcontainers** for Kafka and PostgreSQL, so Docker must be available.
 
-Key test classes:
+<!-- TODO: list key test classes, e.g. happy path, payment failure compensation, late-event guards -->
 
-| Module | Test classes |
-|---|---|
-| `common-dto` | `CommonDtoApplicationTests`, `DocumentationConsistencyTest` |
-| `order-service` | `OrderStateMachineIntegrationTest`, `OrderStateMachineTest`, `OutboxIntegrationTest`, `OrderServiceApplicationTests` |
-| `inventory-service` | `InventoryOutboxIntegrationTest`, `InventoryServiceImplTest`, `InventoryServiceApplicationTests` |
-| `payment-service` | `PaymentIdempotencyIntegrationTest`, `PaymentServiceApplicationTests` |
-| `saga-orchestrator` | `SagaPersistenceIntegrationTest`, `SagaStateMachineTest`, `SagaOrchestratorApplicationTests` |
-| `gateway-service` | `GatewayServiceApplicationTests` |
+Not yet covered by dedicated automated integration tests: end-to-end retry/DLT behaviour and DLT replay.
 
-## Implementation status
+## Design decisions
 
-| Phase | Scope | Status |
-|---|---|---|
-| 0 | Parent POM, CI, Flyway baseline, Docker Compose, Testcontainers base | Done |
-| 1 | Idempotent payment charge, deterministic failure rule | Done |
-| 2 | Single-writer order state machine | Done |
-| 3 | Transactional outbox (order, inventory, payment) | Done |
-| 4 | Persistent saga state, orchestrator outbox | Done |
-| 5 | Compensation, watchdog, `NEEDS_ATTENTION`, admin recovery | Done |
-| 6 | Retry, DLQ, consumer configuration | Done |
-| 7 | OpenTelemetry tracing, structured JSON logs, metrics, dashboards | Not started |
-| 8 | ADRs and failure matrix tied to tests | Done |
-
-Not yet implemented:
-
-- **Observability.** There is no distributed tracing, Prometheus metrics or Grafana yet. Logs carry `traceId` through MDC only.
-- **Client idempotency.** The `Idempotency-Key` header on `POST /orders` is not implemented, so a retried request can create two orders.
-- **API hygiene.** Request validation and standard error payloads are not yet standardized.
-- **Chaos-lite harness.** There is no fault-injection harness beyond the integration tests.
-
-## Design items not yet implemented
-
-- **Inventory reservation design (R16).** The design selects an atomic conditional decrement as the primary oversell guard. Current `InventoryServiceImpl.processReserve` instead locks each inventory row with `findByProductIdForUpdate`, checks `availableQty`, then saves the entity; the conditional SQL update currently applies to release only.
-- **End-to-end retry/DLT verification (Phase 6).** Tests check listener annotations, group configuration and topic creation/partitions, but do not exercise retry-then-success, poison-to-DLT without partition blocking, or DLT replay idempotence.
-- **Inventory duplicate-reserve behavior.** `processed_inventory_events` prevents a second stock mutation, but a duplicate `inventory.reserve.cmd` currently returns without re-emitting the original acknowledgement; no dedicated integration test covers this path.
+- **Orchestration over choreography.** One place owns the workflow, timeouts, and compensation order, which makes failure handling explicit and debuggable at the cost of a central component.
+- **Outbox over dual writes.** Publishing directly to Kafka after a DB commit can lose or duplicate messages; the outbox makes both writes atomic and moves delivery to a retryable poller.
+- **Kafka over synchronous REST between services.** Commands are durable records, so a downstream service can be down and catch up later. For simple lookups needing an immediate answer, REST remains the better fit.
+- **Key by `orderId`.** Preserves per-order ordering while allowing parallelism across partitions.
+- **Tolerate duplicates instead of chasing exactly-once.** At-least-once delivery plus idempotent handlers is simpler and honest about what Kafka guarantees here.
+- **Pessimistic lock on inventory, optimistic version on orders and sagas.** See limitations for the inventory trade-off.
 
 ## Known limitations
 
-- The gateway uses `permitAll`. There is no authentication or authorization.
-- Delivery is at-least-once with idempotent processing. Exactly-once is not claimed.
-- The outbox uses a simple poller rather than CDC, so latency and throughput are limited.
-- The orchestrator is hand-rolled. A workflow engine such as Temporal would provide timers, retries and history out of the box.
-- DLT replay is a manual operator action, and `NEEDS_ATTENTION` sagas need operator intervention.
-- Payment is a deterministic simulation. There is no real provider, reconciliation or unknown-outcome handling.
-- The shared `common-dto` module couples deployments. Schema versioning is out of scope.
+This section is deliberate; these are known gaps, not oversights.
 
-## Documentation
+- **No authentication or authorization.** The gateway permits all requests; admin and DLT-replay endpoints are unauthenticated and not routed through the gateway. Do not expose service ports publicly.
+- **Payment is a simulation**, not a real provider.
+- **Inventory reservation** loads the product row `FOR UPDATE`, checks quantity, then saves. An atomic conditional decrement would reduce contention on hot rows.
+- **Observability:** MDC correlation via `traceId` only. No OpenTelemetry tracing, Prometheus metrics, or Grafana dashboard.
+- **No client `Idempotency-Key`** on `POST /orders`: a client retry can create a second order.
+- **No standardized API validation or error contract.**
+- **No schema registry**, and no chaos or fault-injection harness.
+- **Single-broker, replication factor 1** topic configuration, suitable for local development only.
 
-- [`design.md`](design.md): the architecture and behavior implemented in the repository.
-- [`requirement.md`](requirement.md): Phase 7 and other pending requirements and future work.
-- [Architecture decision records](docs/adr/README.md): index of orchestration, outbox, idempotency, inventory contention, retry/DLQ, shared DTO and order-status decisions.
-- [Failure matrix](docs/failure-matrix.md): scenarios mapped to automated test methods, with missing coverage called out explicitly.
+Planned work is tracked in [requirement.md](requirement.md).
+
+## Tech stack
+
+Java 17, Spring Boot 3.2.5, Spring Kafka, Spring Data JPA / Hibernate, PostgreSQL, Flyway, Apache Kafka (KRaft), Maven (multi-module), Testcontainers, Docker Compose.
+
+## Further reading
+
+- [As-built design](docs/design.md) <!-- TODO: confirm path -->
+- [Failure matrix](docs/failure-matrix.md)
+- [Requirements and roadmap](requirement.md)
 
 ## Author
 
-**Deepana Balmoor**, Java Backend Developer
-GitHub: https://github.com/dbalmoor
-LinkedIn: https://linkedin.com/in/deepanabalmoor
+**Deepana Balmoor**, Software Engineer (Java backend)
+[GitHub](https://github.com/dbalmoor) · [LinkedIn](https://linkedin.com/in/deepanabalmoor)
