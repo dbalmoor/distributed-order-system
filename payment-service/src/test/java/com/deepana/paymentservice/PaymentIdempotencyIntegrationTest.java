@@ -2,17 +2,16 @@ package com.deepana.paymentservice;
 
 import com.deepana.paymentservice.entity.Payment;
 import com.deepana.paymentservice.entity.PaymentType;
-import com.deepana.paymentservice.kafka.PaymentEventProducer;
 import com.deepana.paymentservice.repository.PaymentRepository;
 import com.deepana.paymentservice.service.PaymentService;
 import com.deepana.saga.commondto.payment.ChargePaymentCommand;
-import com.deepana.saga.commondto.payment.PaymentFailedEvent;
-import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,12 +23,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(properties = "payment.fail-amount-threshold=100.00")
+@SpringBootTest(properties = {
+        "payment.fail-amount-threshold=100.00",
+        "outbox.poller.enabled=false"
+})
 class PaymentIdempotencyIntegrationTest extends IntegrationTestBase {
 
     @Autowired
@@ -38,13 +37,16 @@ class PaymentIdempotencyIntegrationTest extends IntegrationTestBase {
     @Autowired
     private PaymentRepository paymentRepository;
 
-    @MockBean
-    private PaymentEventProducer producer;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @BeforeEach
-    void cleanDatabaseAndMocks() {
+    void cleanDatabase() {
         paymentRepository.deleteAllInBatch();
-        reset(producer);
+        jdbcTemplate.update("DELETE FROM outbox");
     }
 
     @Test
@@ -59,7 +61,7 @@ class PaymentIdempotencyIntegrationTest extends IntegrationTestBase {
         assertThat(payments.get(0).getSagaId()).isEqualTo(command.getSagaId());
         assertThat(payments.get(0).getType()).isEqualTo(PaymentType.CHARGE);
         assertThat(payments.get(0).getStatus()).isEqualTo("SUCCESS");
-        verify(producer, times(2)).sendSuccess(any(PaymentSuccessEvent.class));
+        assertThat(outboxCount("payment.success")).isEqualTo(2);
     }
 
     @Test
@@ -76,8 +78,8 @@ class PaymentIdempotencyIntegrationTest extends IntegrationTestBase {
                 .hasValueSatisfying(payment -> assertThat(payment.getStatus()).isEqualTo("FAILED"));
         assertThat(paymentRepository.findBySagaIdAndType(successfulCommand.getSagaId(), PaymentType.CHARGE))
                 .hasValueSatisfying(payment -> assertThat(payment.getStatus()).isEqualTo("SUCCESS"));
-        verify(producer, times(2)).sendFailed(any(PaymentFailedEvent.class));
-        verify(producer).sendSuccess(any(PaymentSuccessEvent.class));
+        assertThat(outboxCount("payment.failed")).isEqualTo(2);
+        assertThat(outboxCount("payment.success")).isEqualTo(1);
     }
 
     @Test
@@ -100,7 +102,24 @@ class PaymentIdempotencyIntegrationTest extends IntegrationTestBase {
         assertThat(paymentRepository.count()).isEqualTo(1);
         assertThat(paymentRepository.findBySagaIdAndType(command.getSagaId(), PaymentType.CHARGE))
                 .hasValueSatisfying(payment -> assertThat(payment.getStatus()).isEqualTo("SUCCESS"));
-        verify(producer, times(2)).sendSuccess(any(PaymentSuccessEvent.class));
+        assertThat(outboxCount("payment.success")).isEqualTo(2);
+    }
+
+    @Test
+    void rolledBackChargeLeavesNeitherPaymentNorOutboxEvent() {
+        ChargePaymentCommand command = command("45.00");
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).execute(status -> {
+            paymentService.processPayment(command);
+            throw new IllegalStateException("force transaction rollback");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(paymentRepository.count()).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM outbox", Long.class)).isZero();
+    }
+
+    private long outboxCount(String topic) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM outbox WHERE topic = ?", Long.class, topic);
     }
 
     private void processAfter(CountDownLatch start, ChargePaymentCommand command) {

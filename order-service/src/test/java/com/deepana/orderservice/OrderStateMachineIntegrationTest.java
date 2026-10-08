@@ -4,6 +4,7 @@ import com.deepana.orderservice.entity.Order;
 import com.deepana.orderservice.entity.OrderStatus;
 import com.deepana.orderservice.kafka.OrderCommandConsumer;
 import com.deepana.orderservice.repository.OrderRepository;
+import com.deepana.orderservice.outbox.OutboxPoller;
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.saga.commondto.order.CancelOrderCommand;
 import com.deepana.saga.commondto.order.ConfirmOrderCommand;
@@ -39,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-@SpringBootTest
+@SpringBootTest(properties = "outbox.poller.enabled=false")
 @AutoConfigureMockMvc
 class OrderStateMachineIntegrationTest extends IntegrationTestBase {
 
@@ -59,6 +60,9 @@ class OrderStateMachineIntegrationTest extends IntegrationTestBase {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
+    private OutboxPoller outboxPoller;
+
+    @Autowired
     private MockMvc mockMvc;
 
     @Autowired
@@ -68,6 +72,7 @@ class OrderStateMachineIntegrationTest extends IntegrationTestBase {
     void clearOrders() {
         jdbcTemplate.update("DELETE FROM order_items");
         jdbcTemplate.update("DELETE FROM orders");
+        jdbcTemplate.update("DELETE FROM outbox");
     }
 
     @Test
@@ -75,6 +80,7 @@ class OrderStateMachineIntegrationTest extends IntegrationTestBase {
         Order order = createOrder();
         try (KafkaConsumer<String, String> consumer = consumer("order.confirmed")) {
             commandConsumer.onConfirm(json(confirm(order)));
+            outboxPoller.pollOnce();
 
             ConsumerRecord<String, String> record = pollRecord(consumer);
             assertThat(record.key()).isEqualTo(order.getId().toString());
@@ -89,6 +95,7 @@ class OrderStateMachineIntegrationTest extends IntegrationTestBase {
         Order order = createOrder();
         try (KafkaConsumer<String, String> consumer = consumer("order.cancelled")) {
             commandConsumer.onCancel(json(cancel(order)));
+            outboxPoller.pollOnce();
 
             ConsumerRecord<String, String> record = pollRecord(consumer);
             assertThat(record.key()).isEqualTo(order.getId().toString());
@@ -104,9 +111,11 @@ class OrderStateMachineIntegrationTest extends IntegrationTestBase {
         try (KafkaConsumer<String, String> consumer = consumer("order.confirmed")) {
             ConfirmOrderCommand command = confirm(order);
             commandConsumer.onConfirm(json(command));
+            outboxPoller.pollOnce();
             assertThat(pollRecord(consumer)).isNotNull();
 
             commandConsumer.onConfirm(json(command));
+            outboxPoller.pollOnce();
             assertThat(consumer.poll(Duration.ofSeconds(1)).count()).isZero();
             assertThat(status(order)).isEqualTo(OrderStatus.COMPLETED);
         }

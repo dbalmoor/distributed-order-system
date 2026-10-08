@@ -2,6 +2,20 @@ spring:
   application:
     name: saga-orchestrator
 
+  datasource:
+    url: jdbc:postgresql://localhost:5435/sagadb
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
   kafka:
     bootstrap-servers: localhost:9092
 
@@ -19,7 +33,7 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     listener:
-      ack-mode: manual
+      ack-mode: record
       missing-topics-fatal: false
 
 
@@ -38,3 +52,13 @@ management:
     web:
       exposure:
         include: health,info
+
+saga:
+  step-deadline: ${SAGA_STEP_DEADLINE:PT30M}
+
+outbox:
+  poller:
+    enabled: ${OUTBOX_POLLER_ENABLED:true}
+    interval-ms: ${OUTBOX_POLL_INTERVAL_MS:500}
+    batch-size: ${OUTBOX_POLL_BATCH_SIZE:50}
+    lease-ms: ${OUTBOX_LEASE_MS:30000}

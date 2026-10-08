@@ -1,9 +1,8 @@
 package com.deepana.sagaorchestrator.entity;
 
 public enum SagaStatus {
-    STARTED,
+    ACTIVE,
+    COMPENSATING,
     COMPLETED,
-    FAILED,
-    COMPENSATING
+    CANCELLED
 }
-

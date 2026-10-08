@@ -14,8 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.UUID;
@@ -114,7 +112,7 @@ public class OrderServiceImpl implements OrderService {
         event.setOrderNumber(order.getOrderNumber());
         event.setTraceId(order.getOrderNumber());
         event.setTimestamp(java.time.Instant.now());
-        afterCommit(() -> orderEventProducer.sendCancelRequested(event));
+        orderEventProducer.sendCancelRequested(event);
         log.info("Cancellation requested for order {}", orderId);
 
         return orderMapper.toResponse(order);
@@ -135,7 +133,7 @@ public class OrderServiceImpl implements OrderService {
 
             OrderConfirmedEvent event = new OrderConfirmedEvent();
             copyCommandFields(cmd, order, event);
-            afterCommit(() -> orderEventProducer.sendOrderConfirmed(event));
+            orderEventProducer.sendOrderConfirmed(event);
         }
     }
 
@@ -154,7 +152,7 @@ public class OrderServiceImpl implements OrderService {
 
             OrderCancelledEvent event = new OrderCancelledEvent();
             copyCommandFields(cmd, order, event);
-            afterCommit(() -> orderEventProducer.sendOrderCancelled(event));
+            orderEventProducer.sendOrderCancelled(event);
         }
     }
 
@@ -169,15 +167,4 @@ public class OrderServiceImpl implements OrderService {
         event.setTimestamp(java.time.Instant.now());
     }
 
-    private void afterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            throw new IllegalStateException("Order event publication requires an active transaction");
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
-    }
 }

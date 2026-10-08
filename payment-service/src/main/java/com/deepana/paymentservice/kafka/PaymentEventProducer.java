@@ -1,10 +1,9 @@
 package com.deepana.paymentservice.kafka;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.deepana.paymentservice.outbox.OutboxWriter;
+import com.deepana.saga.commondto.base.BaseEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.MDC;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -12,35 +11,18 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PaymentEventProducer {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final OutboxWriter outboxWriter;
 
-    public void sendSuccess(Object event) {
-
-        try {
-            String json = objectMapper.writeValueAsString(event);
-
-
-            kafkaTemplate.send("payment.success", json);
-
-            log.info("Payment success sent: {}", json);
-
-        } catch (Exception e) {
-            log.error("Failed to send payment success", e);
-        }
+    public void sendSuccess(BaseEvent event) {
+        write("payment.success", event);
     }
 
-    public void sendFailed(Object event) {
+    public void sendFailed(BaseEvent event) {
+        write("payment.failed", event);
+    }
 
-        try {
-            String json = objectMapper.writeValueAsString(event);
-
-            kafkaTemplate.send("payment.failed", json);
-
-            log.info("Payment failed sent: {}", json);
-
-        } catch (Exception e) {
-            log.error("Failed to send payment failed", e);
-        }
+    private void write(String topic, BaseEvent event) {
+        outboxWriter.write("ORDER", topic, topic, event);
+        log.info("{} queued in transactional outbox for order {}", topic, event.getOrderId());
     }
 }

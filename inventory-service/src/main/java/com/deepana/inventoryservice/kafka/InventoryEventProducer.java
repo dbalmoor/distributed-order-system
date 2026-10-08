@@ -2,10 +2,10 @@ package com.deepana.inventoryservice.kafka;
 
 import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.deepana.saga.commondto.base.BaseEvent;
+import com.deepana.inventoryservice.outbox.OutboxWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -13,8 +13,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class InventoryEventProducer {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final OutboxWriter outboxWriter;
 
     private static final String RESERVED_TOPIC = "inventory.reserved";
     private static final String FAILED_TOPIC = "inventory.failed";
@@ -36,19 +35,10 @@ public class InventoryEventProducer {
     // ================= COMMON SEND =================
 
     private void send(String topic, String key, Object payload) {
-
-        try {
-
-            String json = objectMapper.writeValueAsString(payload);
-
-            kafkaTemplate.send(topic, key, json);
-
-            log.info("Inventory Event Sent [{}] => {}", topic, json);
-
-        } catch (Exception e) {
-
-            log.error("Failed to publish event to {}", topic, e);
-            throw new RuntimeException(e);
+        if (!(payload instanceof BaseEvent event)) {
+            throw new IllegalArgumentException("Inventory outbox payload must be a BaseEvent");
         }
+        outboxWriter.write("ORDER", topic, topic, event);
+        log.info("Inventory event queued in outbox [{}] for key {}", topic, key);
     }
 }

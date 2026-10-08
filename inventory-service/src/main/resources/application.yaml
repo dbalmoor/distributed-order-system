@@ -33,4 +33,9 @@ spring:
       ddl-auto: validate
     show-sql: true
 
-
+outbox:
+  poller:
+    enabled: ${OUTBOX_POLLER_ENABLED:true}
+    interval-ms: ${OUTBOX_POLL_INTERVAL_MS:500}
+    batch-size: ${OUTBOX_POLL_BATCH_SIZE:50}
+    lease-ms: ${OUTBOX_LEASE_MS:30000}

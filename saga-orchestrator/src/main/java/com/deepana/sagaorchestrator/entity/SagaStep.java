@@ -1,8 +1,10 @@
 package com.deepana.sagaorchestrator.entity;
 
 public enum SagaStep {
-    ORDER_CREATED,
-    INVENTORY_RESERVED,
-    PAYMENT_DONE,
-    COMPENSATED
+    RESERVE_INVENTORY,
+    CHARGE_PAYMENT,
+    CONFIRM_ORDER,
+    CANCEL_ORDER,
+    COMPLETED,
+    CANCELLED
 }

@@ -2,40 +2,20 @@ package com.deepana.orderservice.kafka;
 
 import com.deepana.saga.commondto.order.*;
 import com.deepana.saga.commondto.base.BaseEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.deepana.orderservice.outbox.OutboxWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
-
-import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OrderEventProducer {
 
-    // IMPORTANT: Object, not String
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
-
+    private final OutboxWriter outboxWriter;
 
     public void sendOrderCreated(OrderCreatedEvent event) {
-
-        try {
-            String json = objectMapper.writeValueAsString(event);
-
-            kafkaTemplate.send(
-                    "order.created",
-                    String.valueOf(event.getOrderId()),
-                    json
-            );
-
-            log.info("order.created sent: {}", json);
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        write("order.created", event);
     }
 
 
@@ -52,18 +32,11 @@ public class OrderEventProducer {
     }
 
     private void send(String topic, BaseEvent event) {
-        try {
-            String json = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send(topic, String.valueOf(event.getOrderId()), json)
-                    .get(10, TimeUnit.SECONDS);
-            log.info("{} sent: {}", topic, json);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("Interrupted while publishing {}", topic, e);
-            throw new IllegalStateException("Interrupted while publishing " + topic, e);
-        } catch (Exception e) {
-            log.error("Failed to publish {}", topic, e);
-            throw new IllegalStateException("Failed to publish " + topic, e);
-        }
+        write(topic, event);
+    }
+
+    private void write(String topic, BaseEvent event) {
+        outboxWriter.write("ORDER", topic, topic, event);
+        log.info("{} queued in transactional outbox for order {}", topic, event.getOrderId());
     }
 }

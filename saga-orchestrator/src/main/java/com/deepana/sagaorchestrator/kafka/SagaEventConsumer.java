@@ -7,23 +7,24 @@ import com.deepana.saga.commondto.order.OrderCreatedEvent;
 import com.deepana.saga.commondto.order.OrderCancelRequestedEvent;
 import com.deepana.saga.commondto.order.OrderCancelledEvent;
 import com.deepana.saga.commondto.order.OrderConfirmedEvent;
-import com.deepana.saga.commondto.order.CancelOrderCommand;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import com.deepana.sagaorchestrator.service.SagaService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.Header;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class SagaEventConsumer {
 
     private final SagaService sagaService;
-    private final SagaCommandProducer sagaCommandProducer;
     private final ObjectMapper objectMapper;
 
     // ---------------- ORDER ----------------
@@ -33,20 +34,9 @@ public class SagaEventConsumer {
             groupId = "saga-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onOrderCreated(String message) {
-
-        try {
-            OrderCreatedEvent event =
-                    objectMapper.readValue(message, OrderCreatedEvent.class);
-
-            log.info("Received order {}", event.getOrderNumber());
-
-            sagaService.handleOrderCreated(event);
-
-        } catch (Exception e) {
-            log.error("Failed to process order.created", e);
-            throw new RuntimeException(e);
-        }
+    public void onOrderCreated(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        OrderCreatedEvent event = objectMapper.readValue(record.value(), OrderCreatedEvent.class);
+        sagaService.handleOrderCreated(event, messageId(record));
     }
 
     // ---------------- INVENTORY ----------------
@@ -56,18 +46,10 @@ public class SagaEventConsumer {
             groupId = "saga-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onInventoryReserved(String message) {
-
-        try {
-            InventoryReservedEvent event =
-                    objectMapper.readValue(message, InventoryReservedEvent.class);
-
-            sagaService.handleInventoryReserved(event);
-
-        } catch (Exception e) {
-            log.error("Failed to process inventory.reserved", e);
-            throw new RuntimeException(e);
-        }
+    public void onInventoryReserved(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        InventoryReservedEvent event =
+                objectMapper.readValue(record.value(), InventoryReservedEvent.class);
+        sagaService.handleInventoryReserved(event, messageId(record));
     }
 
     @KafkaListener(
@@ -75,18 +57,10 @@ public class SagaEventConsumer {
             groupId = "saga-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onInventoryFailed(String message) {
-
-        try {
-            InventoryFailedEvent event =
-                    objectMapper.readValue(message, InventoryFailedEvent.class);
-
-            sagaService.handleInventoryFailed(event);
-
-        } catch (Exception e) {
-            log.error("Failed to process inventory.failed", e);
-            throw new RuntimeException(e);
-        }
+    public void onInventoryFailed(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        InventoryFailedEvent event =
+                objectMapper.readValue(record.value(), InventoryFailedEvent.class);
+        sagaService.handleInventoryFailed(event, messageId(record));
     }
 
     // ---------------- PAYMENT ----------------
@@ -96,18 +70,10 @@ public class SagaEventConsumer {
             groupId = "saga-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onPaymentSuccess(String message) {
-
-        try {
-            PaymentSuccessEvent event =
-                    objectMapper.readValue(message, PaymentSuccessEvent.class);
-
-            sagaService.handlePaymentSuccess(event);
-
-        } catch (Exception e) {
-            log.error("Failed to process payment.success", e);
-            throw new RuntimeException(e);
-        }
+    public void onPaymentSuccess(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        PaymentSuccessEvent event =
+                objectMapper.readValue(record.value(), PaymentSuccessEvent.class);
+        sagaService.handlePaymentSuccess(event, messageId(record));
     }
 
     @KafkaListener(
@@ -115,18 +81,10 @@ public class SagaEventConsumer {
             groupId = "saga-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onPaymentFailed(String message) {
-
-        try {
-            PaymentFailedEvent event =
-                    objectMapper.readValue(message, PaymentFailedEvent.class);
-
-            sagaService.handlePaymentFailed(event);
-
-        } catch (Exception e) {
-            log.error("Failed to process payment.failed", e);
-            throw new RuntimeException(e);
-        }
+    public void onPaymentFailed(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        PaymentFailedEvent event =
+                objectMapper.readValue(record.value(), PaymentFailedEvent.class);
+        sagaService.handlePaymentFailed(event, messageId(record));
     }
 
     @KafkaListener(
@@ -134,22 +92,10 @@ public class SagaEventConsumer {
             groupId = "saga-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onOrderCancelRequested(String message) {
-        try {
-            OrderCancelRequestedEvent event =
-                    objectMapper.readValue(message, OrderCancelRequestedEvent.class);
-            CancelOrderCommand command = new CancelOrderCommand();
-            command.setSagaId(event.getSagaId());
-            command.setOrderId(event.getOrderId());
-            command.setOrderNumber(event.getOrderNumber());
-            command.setTraceId(event.getTraceId());
-            command.setTimestamp(event.getTimestamp());
-            command.setReason("USER_REQUESTED");
-            sagaCommandProducer.sendCancelOrder(command);
-        } catch (Exception e) {
-            log.error("Failed to process order.cancel.requested", e);
-            throw new RuntimeException(e);
-        }
+    public void onOrderCancelRequested(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        OrderCancelRequestedEvent event =
+                objectMapper.readValue(record.value(), OrderCancelRequestedEvent.class);
+        sagaService.handleCancelRequested(event, messageId(record));
     }
 
     @KafkaListener(
@@ -157,15 +103,23 @@ public class SagaEventConsumer {
             groupId = "saga-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onOrderTerminalEvent(String message) {
-        try {
-            com.deepana.saga.commondto.base.BaseEvent event =
-                    objectMapper.readValue(message, com.deepana.saga.commondto.base.BaseEvent.class);
-            log.info("Received terminal order event for order {}", event.getOrderId());
-            // TODO Phase 4: validate the saga pivot and complete the persisted saga from this event.
-        } catch (Exception e) {
-            log.error("Failed to process order.confirmed/order.cancelled", e);
-            throw new RuntimeException(e);
+    public void onOrderTerminalEvent(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        String messageId = messageId(record);
+        if ("order.confirmed".equals(record.topic())) {
+            OrderConfirmedEvent event = objectMapper.readValue(record.value(), OrderConfirmedEvent.class);
+            sagaService.handleOrderConfirmed(event, messageId);
+        } else {
+            OrderCancelledEvent event = objectMapper.readValue(record.value(), OrderCancelledEvent.class);
+            sagaService.handleOrderCancelled(event, messageId);
         }
+    }
+
+    private String messageId(ConsumerRecord<String, String> record) {
+        Header header = record.headers().lastHeader("messageId");
+        if (header == null || header.value() == null) {
+            throw new IllegalArgumentException(
+                    "Kafka message on " + record.topic() + " is missing messageId header");
+        }
+        return new String(header.value(), StandardCharsets.UTF_8);
     }
 }

@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Service
@@ -44,69 +46,52 @@ public class InventoryServiceImpl implements InventoryService {
             return;
         }
 
-        try {
-
-            // 2️⃣ Check and reserve stock
-            for (OrderItemEvent item : cmd.getItems()) {
-
-                Inventory inventory = inventoryRepository
-                        .findByProductIdForUpdate(item.getProductId())
-                        .orElseThrow(() ->
-                                new RuntimeException("Product not found: "
-                                        + item.getProductId()));
-
-                if (inventory.getAvailableQty() < item.getQuantity()) {
-                    throw new RuntimeException("Insufficient stock for product "
-                            + item.getProductId());
-                }
-
-                inventory.setAvailableQty(
-                        inventory.getAvailableQty() - item.getQuantity()
-                );
-
-                inventory.setReservedQty(
-                        inventory.getReservedQty() + item.getQuantity()
-                );
-
-                inventoryRepository.save(inventory);
+        List<Inventory> lockedInventory = new ArrayList<>();
+        for (OrderItemEvent item : cmd.getItems()) {
+            Inventory inventory = inventoryRepository
+                    .findByProductIdForUpdate(item.getProductId())
+                    .orElse(null);
+            if (inventory == null) {
+                emitReserveFailure(cmd, "Product not found: " + item.getProductId());
+                return;
             }
+            if (inventory.getAvailableQty() < item.getQuantity()) {
+                emitReserveFailure(cmd, "Insufficient stock for product " + item.getProductId());
+                return;
+            }
+            lockedInventory.add(inventory);
+        }
 
-            // 3️⃣ Mark RESERVE processed
-            ProcessedInventoryEvent processed = new ProcessedInventoryEvent();
-            processed.setSagaId(cmd.getSagaId());
-            processed.setOrderId(orderId);
-            processed.setEventType("RESERVE");
-            processed.setProcessedAt(LocalDateTime.now());
+        for (int i = 0; i < cmd.getItems().size(); i++) {
+            OrderItemEvent item = cmd.getItems().get(i);
+            Inventory inventory = lockedInventory.get(i);
+            inventory.setAvailableQty(inventory.getAvailableQty() - item.getQuantity());
+            inventory.setReservedQty(inventory.getReservedQty() + item.getQuantity());
+            inventoryRepository.save(inventory);
+        }
 
-            processedRepo.save(processed);
+        ProcessedInventoryEvent processed = new ProcessedInventoryEvent();
+        processed.setSagaId(cmd.getSagaId());
+        processed.setOrderId(orderId);
+        processed.setEventType("RESERVE");
+        processed.setProcessedAt(LocalDateTime.now());
+        processedRepo.save(processed);
 
-            // 4️⃣ Publish success
-            InventoryReservedEvent successEvent = new InventoryReservedEvent();
+        InventoryReservedEvent successEvent = new InventoryReservedEvent();
+        copyBaseFields(cmd, successEvent);
+        successEvent.setTotalAmount(cmd.getTotalAmount());
+        successEvent.setItems(cmd.getItems());
+        producer.sendInventoryReserved(successEvent);
 
-            copyBaseFields(cmd, successEvent);
+        SagaLogger.success("INVENTORY", String.valueOf(orderId), "RESERVED_EVENT_PUBLISHED");
+    }
 
-            successEvent.setTotalAmount(cmd.getTotalAmount());
-            successEvent.setItems(cmd.getItems());
-
-            producer.sendInventoryReserved(successEvent);
-
-            SagaLogger.success("INVENTORY", String.valueOf(orderId),
-                    "RESERVED_EVENT_PUBLISHED");
-
-        } catch (Exception ex) {
-
+    private void emitReserveFailure(ReserveInventoryCommand cmd, String reason) {
             InventoryFailedEvent failedEvent = new InventoryFailedEvent();
             copyBaseFields(cmd, failedEvent);
-            failedEvent.setReason(ex.getMessage());
-
+            failedEvent.setReason(reason);
             producer.sendInventoryFailed(failedEvent);
-
-            SagaLogger.failed("INVENTORY",
-                    String.valueOf(orderId),
-                    "FAILED_EVENT_PUBLISHED");
-
-            throw ex; // Let transaction roll back
-        }
+            SagaLogger.failed("INVENTORY", String.valueOf(cmd.getOrderId()), "FAILED_EVENT_PUBLISHED");
     }
 
 
