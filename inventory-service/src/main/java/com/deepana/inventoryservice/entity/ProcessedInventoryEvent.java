@@ -1,12 +1,12 @@
 package com.deepana.inventoryservice.entity;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "processed_inventory_events")
 @Data
 public class ProcessedInventoryEvent {
 
@@ -18,7 +18,7 @@ public class ProcessedInventoryEvent {
 
     private Long orderId;
 
-    private String eventType; // RESERVE or RELEASE
+    private String eventType;
 
     private LocalDateTime processedAt;
 }

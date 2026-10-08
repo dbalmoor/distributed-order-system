@@ -90,8 +90,6 @@ public class InventoryServiceImpl implements InventoryService {
 
             producer.sendInventoryReserved(successEvent);
 
-            producer.sendInventoryReserved(successEvent);
-
             SagaLogger.success("INVENTORY", String.valueOf(orderId),
                     "RESERVED_EVENT_PUBLISHED");
 
