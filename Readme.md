@@ -179,7 +179,7 @@ Every operator action is recorded in `saga_step_log`.
 
 ```bash
 # 1. Start Kafka (KRaft) and the service databases
-docker compose -f docker-compose-kafka.yml up -d   # TODO: confirm file name / command
+docker compose -f up -d
 
 # 2. Build and run all tests (Testcontainers needs Docker running)
 mvn -B verify
@@ -194,10 +194,26 @@ mvn -pl saga-orchestrator spring-boot:run
 Create an order:
 
 ```bash
-# TODO: replace with your real request body and port
-curl -X POST http://localhost:8080/orders \
-  -H "Content-Type: application/json" \
-  -d '{ "...": "..." }'
+curl --location 'http://localhost:8081/orders' \
+--header 'Content-Type: application/json' \
+--data '{
+  "userId": 102,
+  "paymentType": "ONLINE",
+  "fulfillmentType": "DELIVERY",
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2,
+      "price": 500
+    },
+    {
+      "productId": 2,
+      "quantity": 1,
+      "price": 1200
+    }
+  ]
+}
+'
 ```
 
 The response is `202` with an order id. Poll `GET /orders/{id}` for the result (`CREATED` is shown as `PENDING`).
@@ -206,7 +222,14 @@ The response is `202` with an order id. Poll `GET /orders/{id}` for the result (
 
 `mvn -B verify` runs unit and integration tests. Integration tests use **Testcontainers** for Kafka and PostgreSQL, so Docker must be available.
 
-<!-- TODO: list key test classes, e.g. happy path, payment failure compensation, late-event guards -->
+| Module | Test classes |
+|---|---|
+| `common-dto` | `CommonDtoApplicationTests`, `DocumentationConsistencyTest` |
+| `order-service` | `OrderStateMachineIntegrationTest`, `OrderStateMachineTest`, `OutboxIntegrationTest`, `OrderServiceApplicationTests` |
+| `inventory-service` | `InventoryOutboxIntegrationTest`, `InventoryServiceImplTest`, `InventoryServiceApplicationTests` |
+| `payment-service` | `PaymentIdempotencyIntegrationTest`, `PaymentServiceApplicationTests` |
+| `saga-orchestrator` | `SagaPersistenceIntegrationTest`, `SagaStateMachineTest`, `SagaOrchestratorApplicationTests` |
+| `gateway-service` | `GatewayServiceApplicationTests` |
 
 Not yet covered by dedicated automated integration tests: end-to-end retry/DLT behaviour and DLT replay.
 
@@ -240,7 +263,7 @@ Java 17, Spring Boot 3.2.5, Spring Kafka, Spring Data JPA / Hibernate, PostgreSQ
 
 ## Further reading
 
-- [As-built design](docs/design.md) <!-- TODO: confirm path -->
+- [As-built design](design.md) 
 - [Failure matrix](docs/failure-matrix.md)
 - [Requirements and roadmap](requirement.md)
 
