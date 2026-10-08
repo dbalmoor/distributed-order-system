@@ -5,6 +5,7 @@ import com.deepana.paymentservice.entity.PaymentType;
 import com.deepana.paymentservice.repository.PaymentRepository;
 import com.deepana.paymentservice.service.PaymentService;
 import com.deepana.saga.commondto.payment.ChargePaymentCommand;
+import com.deepana.saga.commondto.payment.RefundPaymentCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -117,6 +118,42 @@ class PaymentIdempotencyIntegrationTest extends IntegrationTestBase {
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM outbox", Long.class)).isZero();
     }
 
+    @Test
+    void successfulChargeIsRefundedOnceAndDuplicateRefundReemitsAcknowledgment() {
+        ChargePaymentCommand charge = command("45.00");
+        paymentService.processPayment(charge);
+        RefundPaymentCommand refund = refundCommand(charge);
+
+        paymentService.processRefund(refund);
+        paymentService.processRefund(refund);
+
+        assertThat(paymentRepository.count()).isEqualTo(2);
+        assertThat(paymentRepository.findBySagaIdAndType(charge.getSagaId(), PaymentType.CHARGE))
+                .hasValueSatisfying(payment -> assertThat(payment.getStatus()).isEqualTo("SUCCESS"));
+        assertThat(paymentRepository.findBySagaIdAndType(charge.getSagaId(), PaymentType.REFUND))
+                .hasValueSatisfying(payment -> assertThat(payment.getStatus()).isEqualTo("REFUNDED"));
+        assertThat(outboxCount("payment.success")).isEqualTo(1);
+        assertThat(outboxCount("payment.refunded")).isEqualTo(2);
+    }
+
+    @Test
+    void refundBeforeChargeCreatesMarkerAndRejectsLaterCharge() {
+        ChargePaymentCommand charge = command("45.00");
+        RefundPaymentCommand refund = refundCommand(charge);
+
+        paymentService.processRefund(refund);
+        paymentService.processPayment(charge);
+        paymentService.processRefund(refund);
+
+        assertThat(paymentRepository.count()).isEqualTo(1);
+        assertThat(paymentRepository.findBySagaIdAndType(charge.getSagaId(), PaymentType.REFUND))
+                .hasValueSatisfying(payment -> assertThat(payment.getStatus()).isEqualTo("REFUNDED"));
+        assertThat(paymentRepository.findBySagaIdAndType(charge.getSagaId(), PaymentType.CHARGE)).isEmpty();
+        assertThat(outboxCount("payment.success")).isZero();
+        assertThat(outboxCount("payment.failed")).isEqualTo(1);
+        assertThat(outboxCount("payment.refunded")).isEqualTo(2);
+    }
+
     private long outboxCount(String topic) {
         return jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM outbox WHERE topic = ?", Long.class, topic);
@@ -142,6 +179,18 @@ class PaymentIdempotencyIntegrationTest extends IntegrationTestBase {
         command.setTraceId(UUID.randomUUID().toString());
         command.setTotalAmount(new BigDecimal(amount));
         command.setItems(List.of());
+        return command;
+    }
+
+    private RefundPaymentCommand refundCommand(ChargePaymentCommand source) {
+        RefundPaymentCommand command = new RefundPaymentCommand();
+        command.setSagaId(source.getSagaId());
+        command.setOrderId(source.getOrderId());
+        command.setOrderNumber(source.getOrderNumber());
+        command.setTraceId(source.getTraceId());
+        command.setTimestamp(source.getTimestamp());
+        command.setTotalAmount(source.getTotalAmount());
+        command.setReason("test refund");
         return command;
     }
 }

@@ -2,7 +2,6 @@ package com.deepana.inventoryservice.service;
 
 import com.deepana.inventoryservice.common.logging.SagaLogger;
 import com.deepana.inventoryservice.entity.Inventory;
-import com.deepana.inventoryservice.entity.ProcessedInventoryEvent;
 import com.deepana.inventoryservice.kafka.InventoryEventProducer;
 import com.deepana.inventoryservice.repository.InventoryRepository;
 
@@ -10,13 +9,12 @@ import com.deepana.inventoryservice.repository.ProcessedInventoryEventRepository
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.saga.commondto.inventory.*;
 import com.deepana.saga.commondto.order.OrderItemEvent;
-
+import org.springframework.jdbc.core.JdbcTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +27,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     private final InventoryRepository inventoryRepository;
     private final InventoryEventProducer producer;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
@@ -37,6 +36,13 @@ public class InventoryServiceImpl implements InventoryService {
         Long orderId = cmd.getOrderId();
 
         SagaLogger.success("INVENTORY", String.valueOf(orderId), "RECEIVED_RESERVE_CMD");
+
+        lockSaga(cmd.getSagaId());
+
+        if (processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RELEASED")) {
+            emitReserveFailure(cmd, "Reservation was already released or cancelled");
+            return;
+        }
 
         // 1️⃣ Idempotency check
         if (processedRepo.existsBySagaIdAndEventType(
@@ -70,12 +76,9 @@ public class InventoryServiceImpl implements InventoryService {
             inventoryRepository.save(inventory);
         }
 
-        ProcessedInventoryEvent processed = new ProcessedInventoryEvent();
-        processed.setSagaId(cmd.getSagaId());
-        processed.setOrderId(orderId);
-        processed.setEventType("RESERVE");
-        processed.setProcessedAt(LocalDateTime.now());
-        processedRepo.save(processed);
+        if (processedRepo.insertIfAbsent(cmd.getSagaId(), orderId, "RESERVE") != 1) {
+            throw new IllegalStateException("Reservation marker already exists for saga " + cmd.getSagaId());
+        }
 
         InventoryReservedEvent successEvent = new InventoryReservedEvent();
         copyBaseFields(cmd, successEvent);
@@ -99,11 +102,10 @@ public class InventoryServiceImpl implements InventoryService {
     @Transactional
     public void processRelease(ReleaseInventoryCommand cmd) {
 
-        // 1️⃣ Idempotency check
-        if (processedRepo.existsBySagaIdAndEventType(
-                cmd.getSagaId(), "RELEASE")) {
-
+        lockSaga(cmd.getSagaId());
+        if (processedRepo.insertIfAbsent(cmd.getSagaId(), cmd.getOrderId(), "RELEASED") == 0) {
             log.info("Release already processed for saga {}", cmd.getSagaId());
+            emitReleased(cmd);
             return;
         }
 
@@ -113,36 +115,19 @@ public class InventoryServiceImpl implements InventoryService {
                 "RELEASE_RECEIVED"
         );
 
-        // 2️⃣ Restore inventory
-        for (OrderItemEvent item : cmd.getItems()) {
-
-            Inventory inventory =
-                    inventoryRepository
-                            .findByProductIdForUpdate(item.getProductId())
-                            .orElseThrow(() ->
-                                    new RuntimeException(
-                                            "Inventory not found for product "
-                                                    + item.getProductId()));
-
-            inventory.setAvailableQty(
-                    inventory.getAvailableQty() + item.getQuantity()
-            );
-
-            inventory.setReservedQty(
-                    inventory.getReservedQty() - item.getQuantity()
-            );
-
-            inventoryRepository.save(inventory);
+        // A marker without a reservation closes the release-before-reserve race.
+        if (processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RESERVE")) {
+            if (cmd.getItems() == null) {
+                throw new IllegalArgumentException("Release command must include reservation items");
+            }
+            for (OrderItemEvent item : cmd.getItems()) {
+                int updated = inventoryRepository.releaseReservation(item.getProductId(), item.getQuantity());
+                if (updated != 1) {
+                    throw new IllegalStateException(
+                            "Could not release reserved stock for product " + item.getProductId());
+                }
+            }
         }
-
-        // 3️⃣ Mark RELEASE processed
-        ProcessedInventoryEvent processed = new ProcessedInventoryEvent();
-        processed.setSagaId(cmd.getSagaId());
-        processed.setOrderId(cmd.getOrderId());
-        processed.setEventType("RELEASE");
-        processed.setProcessedAt(LocalDateTime.now());
-
-        processedRepo.save(processed);
 
         SagaLogger.success(
                 "INVENTORY",
@@ -150,7 +135,25 @@ public class InventoryServiceImpl implements InventoryService {
                 "INVENTORY_RELEASED"
         );
 
+        emitReleased(cmd);
         log.info("Inventory released for order {}", cmd.getOrderId());
+    }
+
+    private void emitReleased(ReleaseInventoryCommand cmd) {
+        InventoryReleasedEvent event = new InventoryReleasedEvent();
+        copyBaseFields(cmd, event);
+        event.setItems(cmd.getItems());
+        producer.sendInventoryReleased(event);
+    }
+
+    private void lockSaga(String sagaId) {
+        if (sagaId == null || sagaId.isBlank()) {
+            throw new IllegalArgumentException("Inventory command must include a sagaId");
+        }
+        jdbcTemplate.query(
+                "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+                (org.springframework.jdbc.core.RowCallbackHandler) resultSet -> { },
+                sagaId);
     }
 
     private void copyBaseFields(BaseEvent source, BaseEvent target) {

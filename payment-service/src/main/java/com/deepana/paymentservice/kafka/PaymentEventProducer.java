@@ -2,6 +2,7 @@ package com.deepana.paymentservice.kafka;
 
 import com.deepana.paymentservice.outbox.OutboxWriter;
 import com.deepana.saga.commondto.base.BaseEvent;
+import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,10 @@ public class PaymentEventProducer {
 
     public void sendFailed(BaseEvent event) {
         write("payment.failed", event);
+    }
+
+    public void sendRefunded(PaymentRefundedEvent event) {
+        write("payment.refunded", event);
     }
 
     private void write(String topic, BaseEvent event) {

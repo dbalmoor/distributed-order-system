@@ -1,6 +1,7 @@
 package com.deepana.sagaorchestrator;
 
 import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
+import com.deepana.saga.commondto.inventory.InventoryReleasedEvent;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
 import com.deepana.saga.commondto.order.OrderCancelRequestedEvent;
 import com.deepana.saga.commondto.order.OrderCancelledEvent;
@@ -8,6 +9,7 @@ import com.deepana.saga.commondto.order.OrderConfirmedEvent;
 import com.deepana.saga.commondto.order.OrderCreatedEvent;
 import com.deepana.saga.commondto.order.OrderItemEvent;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
+import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import com.deepana.sagaorchestrator.outbox.OutboxPoller;
 import com.deepana.sagaorchestrator.outbox.OutboxTransactions;
@@ -93,6 +95,10 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
         sagaService.handleInventoryReserved(reserved(paymentFailure, paymentSaga), messageId());
         sagaService.handlePaymentFailed(paymentFailed(paymentFailure, paymentSaga), messageId());
         assertState(paymentFailure.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(1);
+        assertThat(countOutbox("order.cancel.cmd")).isEqualTo(1);
+        sagaService.handleInventoryReleased(released(paymentFailure, paymentSaga), messageId());
+        assertThat(countOutbox("order.cancel.cmd")).isEqualTo(2);
         sagaService.handleOrderCancelled(cancelled(paymentFailure, paymentSaga), messageId());
         assertState(paymentFailure.getOrderId(), "CANCELLED", "CANCELLED");
     }
@@ -128,20 +134,34 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void cancelRequestsAreAcceptedOnlyBeforeChargeAndBeforePivot() {
+    void cancelRequestsBeforePivotWaitForRequiredCompensationAcknowledgments() {
         OrderCreatedEvent beforeCharge = order(1006L);
         start(beforeCharge);
         sagaService.handleCancelRequested(cancelRequest(beforeCharge), messageId());
         assertState(beforeCharge.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(1);
+        assertThat(countOutbox("order.cancel.cmd")).isZero();
+        String beforeChargeSaga = sagaId(beforeCharge.getOrderId());
+        sagaService.handleInventoryReleased(released(beforeCharge, beforeChargeSaga), messageId());
         assertThat(countOutbox("order.cancel.cmd")).isEqualTo(1);
+        sagaService.handleOrderCancelled(cancelled(beforeCharge, beforeChargeSaga), messageId());
+        assertState(beforeCharge.getOrderId(), "CANCELLED", "CANCELLED");
 
         OrderCreatedEvent duringCharge = order(1007L);
         start(duringCharge);
         String chargeSaga = sagaId(duringCharge.getOrderId());
         sagaService.handleInventoryReserved(reserved(duringCharge, chargeSaga), messageId());
         sagaService.handleCancelRequested(cancelRequest(duringCharge), messageId());
-        assertState(duringCharge.getOrderId(), "ACTIVE", "CHARGE_PAYMENT");
+        assertState(duringCharge.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(2);
+        assertThat(countOutbox("payment.refund.cmd")).isEqualTo(1);
         assertThat(countOutbox("order.cancel.cmd")).isEqualTo(1);
+        sagaService.handleInventoryReleased(released(duringCharge, chargeSaga), messageId());
+        assertThat(countOutbox("order.cancel.cmd")).isEqualTo(1);
+        sagaService.handlePaymentRefunded(refunded(duringCharge, chargeSaga), messageId());
+        assertThat(countOutbox("order.cancel.cmd")).isEqualTo(2);
+        sagaService.handleOrderCancelled(cancelled(duringCharge, chargeSaga), messageId());
+        assertState(duringCharge.getOrderId(), "CANCELLED", "CANCELLED");
 
         OrderCreatedEvent afterPivot = order(1008L);
         start(afterPivot);
@@ -150,33 +170,62 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
         sagaService.handlePaymentSuccess(paymentSuccess(afterPivot, pivotSaga), messageId());
         sagaService.handleCancelRequested(cancelRequest(afterPivot), messageId());
         assertState(afterPivot.getOrderId(), "ACTIVE", "CONFIRM_ORDER");
-        assertThat(countOutbox("order.cancel.cmd")).isEqualTo(1);
+        assertThat(countOutbox("order.cancel.cmd")).isEqualTo(2);
     }
 
     @Test
-    void latePaymentSuccessIsLoggedWithoutChangingStateOrIssuingRefund() {
+    void latePaymentSuccessDuringCompensationWaitsForBothAcknowledgments() {
         OrderCreatedEvent created = order(1009L);
         start(created);
         String sagaId = sagaId(created.getOrderId());
-        sagaService.handleInventoryFailed(inventoryFailed(created, sagaId), messageId());
+        sagaService.handleInventoryReserved(reserved(created, sagaId), messageId());
+        sagaService.handlePaymentFailed(paymentFailed(created, sagaId), messageId());
         sagaService.handlePaymentSuccess(paymentSuccess(created, sagaId), messageId());
 
         assertState(created.getOrderId(), "COMPENSATING", "CANCEL_ORDER");
+        assertThat(countOutbox("payment.refund.cmd")).isEqualTo(1);
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(1);
+        assertThat(countOutbox("order.cancel.cmd")).isZero();
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM saga_step_log
                 WHERE saga_id = ? AND event_type = 'LATE_SUCCESS'
                 """, Long.class, sagaId)).isEqualTo(1);
-        assertThat(countOutbox("payment.refund.cmd")).isZero();
 
+        sagaService.handleInventoryReserved(reserved(created, sagaId), messageId());
+        sagaService.handleInventoryReleased(released(created, sagaId), messageId());
+        assertThat(countOutbox("order.cancel.cmd")).isZero();
+        sagaService.handlePaymentRefunded(refunded(created, sagaId), messageId());
+        assertThat(countOutbox("order.cancel.cmd")).isEqualTo(1);
         sagaService.handleOrderCancelled(cancelled(created, sagaId), messageId());
-        sagaService.handlePaymentSuccess(paymentSuccess(created, sagaId), messageId());
         assertState(created.getOrderId(), "CANCELLED", "CANCELLED");
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM saga_step_log
                 WHERE saga_id = ? AND event_type = 'LATE_SUCCESS'
-                """, Long.class, sagaId)).isEqualTo(2);
+                """, Long.class, sagaId)).isEqualTo(1);
     }
 
+    @Test
+    void latePaymentSuccessAfterCancellationQueuesOneRefund() {
+        OrderCreatedEvent created = order(1012L);
+        start(created);
+        String sagaId = sagaId(created.getOrderId());
+        sagaService.handleInventoryFailed(inventoryFailed(created, sagaId), messageId());
+        sagaService.handleOrderCancelled(cancelled(created, sagaId), messageId());
+
+        sagaService.handlePaymentSuccess(paymentSuccess(created, sagaId), messageId());
+        sagaService.handlePaymentSuccess(paymentSuccess(created, sagaId), messageId());
+
+        assertState(created.getOrderId(), "CANCELLED", "CANCELLED");
+        assertThat(countOutbox("payment.refund.cmd")).isEqualTo(1);
+        assertThat(countOutbox("inventory.release.cmd")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM saga_step_log
+                WHERE saga_id = ? AND event_type = 'LATE_SUCCESS'
+                """, Long.class, sagaId)).isEqualTo(2);
+        sagaService.handleInventoryReleased(released(created, sagaId), messageId());
+        sagaService.handlePaymentRefunded(refunded(created, sagaId), messageId());
+        assertState(created.getOrderId(), "CANCELLED", "CANCELLED");
+    }
     @Test
     void concurrentEventsForOneSagaSerializeThroughTheSagaRowLock() throws Exception {
         OrderCreatedEvent created = order(1010L);
@@ -256,6 +305,13 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
         return event;
     }
 
+    private InventoryReleasedEvent released(OrderCreatedEvent source, String sagaId) {
+        InventoryReleasedEvent event = new InventoryReleasedEvent();
+        copy(source, event, sagaId);
+        event.setItems(source.getItems());
+        return event;
+    }
+
     private PaymentSuccessEvent paymentSuccess(OrderCreatedEvent source, String sagaId) {
         PaymentSuccessEvent event = new PaymentSuccessEvent();
         copy(source, event, sagaId);
@@ -268,6 +324,13 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
         PaymentFailedEvent event = new PaymentFailedEvent();
         copy(source, event, sagaId);
         event.setReason("declined");
+        return event;
+    }
+
+    private PaymentRefundedEvent refunded(OrderCreatedEvent source, String sagaId) {
+        PaymentRefundedEvent event = new PaymentRefundedEvent();
+        copy(source, event, sagaId);
+        event.setTotalAmount(source.getTotalAmount());
         return event;
     }
 

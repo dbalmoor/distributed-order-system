@@ -22,4 +22,24 @@ public class PhaseTwoTopicsConfiguration {
     NewTopic orderCancelledTopic() {
         return TopicBuilder.name("order.cancelled").partitions(1).replicas(1).build();
     }
+
+    @Bean
+    NewTopic inventoryReleaseCommandTopic() {
+        return TopicBuilder.name("inventory.release.cmd").partitions(6).replicas(1).build();
+    }
+
+    @Bean
+    NewTopic inventoryReleasedTopic() {
+        return TopicBuilder.name("inventory.released").partitions(6).replicas(1).build();
+    }
+
+    @Bean
+    NewTopic paymentRefundCommandTopic() {
+        return TopicBuilder.name("payment.refund.cmd").partitions(6).replicas(1).build();
+    }
+
+    @Bean
+    NewTopic paymentRefundedTopic() {
+        return TopicBuilder.name("payment.refunded").partitions(6).replicas(1).build();
+    }
 }

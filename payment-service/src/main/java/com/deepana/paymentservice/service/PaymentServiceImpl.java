@@ -9,13 +9,17 @@ import com.deepana.paymentservice.repository.PaymentRepository;
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.saga.commondto.payment.ChargePaymentCommand;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
+import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
+import com.deepana.saga.commondto.payment.RefundPaymentCommand;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -30,6 +34,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository repository;
     private final PaymentEventProducer producer;
     private final PaymentProperties paymentProperties;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
@@ -39,6 +44,12 @@ public class PaymentServiceImpl implements PaymentService {
 
             if (!isUuid(cmd.getSagaId())) {
                 throw new IllegalArgumentException("Payment charge command must include a sagaId UUID");
+            }
+            lockSaga(cmd.getSagaId());
+
+            if (repository.findBySagaIdAndType(cmd.getSagaId(), PaymentType.REFUND).isPresent()) {
+                publishFailure(cmd, "Charge rejected because a refund marker already exists");
+                return;
             }
 
             SagaLogger.success("PAYMENT", cmd.getOrderNumber(), "PAYMENT_STARTED");
@@ -108,6 +119,75 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         throw new IllegalStateException("Unknown stored payment status: " + payment.getStatus());
+    }
+
+    @Override
+    @Transactional
+    public void processRefund(RefundPaymentCommand cmd) {
+        try {
+            MDC.put("traceId", cmd.getTraceId());
+            if (!isUuid(cmd.getSagaId())) {
+                throw new IllegalArgumentException("Payment refund command must include a sagaId UUID");
+            }
+            lockSaga(cmd.getSagaId());
+
+            Payment charge = repository.findBySagaIdAndType(cmd.getSagaId(), PaymentType.CHARGE)
+                    .filter(payment -> "SUCCESS".equals(payment.getStatus()))
+                    .orElse(null);
+            BigDecimal amount = charge == null ? cmd.getTotalAmount() : charge.getAmount();
+            Long orderId = charge == null ? cmd.getOrderId() : charge.getOrderId();
+            String orderNumber = charge == null ? cmd.getOrderNumber() : charge.getOrderNumber();
+
+            int inserted = repository.insertIfAbsent(
+                    cmd.getSagaId(),
+                    PaymentType.REFUND.name(),
+                    orderId,
+                    orderNumber,
+                    amount,
+                    "REFUNDED",
+                    LocalDateTime.now());
+            Payment refund = repository.findBySagaIdAndType(cmd.getSagaId(), PaymentType.REFUND)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Refund marker not found after idempotent insert for saga " + cmd.getSagaId()));
+            if (inserted == 0) {
+                log.info("Refund already processed for saga {}; re-emitting payment.refunded", cmd.getSagaId());
+            } else if (charge == null) {
+                log.info("Recorded refund-before-charge marker for saga {}", cmd.getSagaId());
+            } else {
+                log.info("Refunded successful charge for saga {}", cmd.getSagaId());
+            }
+
+            PaymentRefundedEvent event = new PaymentRefundedEvent();
+            copyBaseFields(cmd, event);
+            event.setOrderId(refund.getOrderId());
+            event.setOrderNumber(refund.getOrderNumber());
+            event.setTimestamp(Instant.now());
+            event.setTotalAmount(refund.getAmount());
+            event.setReason(cmd.getReason());
+            producer.sendRefunded(event);
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    private void publishFailure(ChargePaymentCommand cmd, String reason) {
+        PaymentFailedEvent event = new PaymentFailedEvent();
+        copyBaseFields(cmd, event);
+        event.setOrderId(cmd.getOrderId());
+        event.setOrderNumber(cmd.getOrderNumber());
+        event.setTimestamp(Instant.now());
+        event.setReason(reason);
+        event.setTotalAmount(cmd.getTotalAmount());
+        event.setItems(cmd.getItems());
+        producer.sendFailed(event);
+        log.warn("Payment charge rejected for saga {}: {}", cmd.getSagaId(), reason);
+    }
+
+    private void lockSaga(String sagaId) {
+        jdbcTemplate.query(
+                "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+                (org.springframework.jdbc.core.RowCallbackHandler) resultSet -> { },
+                sagaId);
     }
 
     private void copyBaseFields(BaseEvent source, BaseEvent target) {

@@ -25,13 +25,23 @@ public class SagaStateMachine {
                     ? next(SagaStatus.ACTIVE, SagaStep.CONFIRM_ORDER) : Optional.empty();
             case PAYMENT_FAILED -> is(current, SagaStatus.ACTIVE, SagaStep.CHARGE_PAYMENT)
                     ? next(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER) : Optional.empty();
+            case INVENTORY_RELEASED -> isCompensating(current)
+                    ? next(current.status(), current.currentStep()) : Optional.empty();
+            case PAYMENT_REFUNDED -> isCompensating(current)
+                    ? next(current.status(), current.currentStep()) : Optional.empty();
             case ORDER_CONFIRMED -> is(current, SagaStatus.ACTIVE, SagaStep.CONFIRM_ORDER)
                     ? next(SagaStatus.COMPLETED, SagaStep.COMPLETED) : Optional.empty();
             case ORDER_CANCELLED -> is(current, SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)
                     ? next(SagaStatus.CANCELLED, SagaStep.CANCELLED) : Optional.empty();
             case CANCEL_REQUESTED -> is(current, SagaStatus.ACTIVE, SagaStep.RESERVE_INVENTORY)
+                    || is(current, SagaStatus.ACTIVE, SagaStep.CHARGE_PAYMENT)
                     ? next(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER) : Optional.empty();
         };
+    }
+
+    private boolean isCompensating(SagaSnapshot current) {
+        return (current.status() == SagaStatus.COMPENSATING && current.currentStep() == SagaStep.CANCEL_ORDER)
+                || (current.status() == SagaStatus.CANCELLED && current.currentStep() == SagaStep.CANCELLED);
     }
 
     private boolean is(SagaSnapshot current, SagaStatus status, SagaStep step) {

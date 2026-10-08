@@ -15,7 +15,7 @@ class SagaStateMachineTest {
     private final SagaStateMachine stateMachine = new SagaStateMachine();
 
     @Test
-    void allowsEverySagaTransitionInThePhaseFourTable() {
+    void allowsEverySagaTransitionInThePhaseFiveATable() {
         Map<Case, SagaTransition> transitions = Map.ofEntries(
                 Map.entry(new Case(SagaStatus.ACTIVE, SagaStep.RESERVE_INVENTORY, SagaTrigger.INVENTORY_RESERVED),
                         new SagaTransition(SagaStatus.ACTIVE, SagaStep.CHARGE_PAYMENT)),
@@ -25,11 +25,17 @@ class SagaStateMachineTest {
                         new SagaTransition(SagaStatus.ACTIVE, SagaStep.CONFIRM_ORDER)),
                 Map.entry(new Case(SagaStatus.ACTIVE, SagaStep.CHARGE_PAYMENT, SagaTrigger.PAYMENT_FAILED),
                         new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)),
+                Map.entry(new Case(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER, SagaTrigger.INVENTORY_RELEASED),
+                        new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)),
+                Map.entry(new Case(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER, SagaTrigger.PAYMENT_REFUNDED),
+                        new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)),
                 Map.entry(new Case(SagaStatus.ACTIVE, SagaStep.CONFIRM_ORDER, SagaTrigger.ORDER_CONFIRMED),
                         new SagaTransition(SagaStatus.COMPLETED, SagaStep.COMPLETED)),
                 Map.entry(new Case(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER, SagaTrigger.ORDER_CANCELLED),
                         new SagaTransition(SagaStatus.CANCELLED, SagaStep.CANCELLED)),
                 Map.entry(new Case(SagaStatus.ACTIVE, SagaStep.RESERVE_INVENTORY, SagaTrigger.CANCEL_REQUESTED),
+                        new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)),
+                Map.entry(new Case(SagaStatus.ACTIVE, SagaStep.CHARGE_PAYMENT, SagaTrigger.CANCEL_REQUESTED),
                         new SagaTransition(SagaStatus.COMPENSATING, SagaStep.CANCEL_ORDER)));
 
         transitions.forEach((input, expected) ->
@@ -46,11 +52,15 @@ class SagaStateMachineTest {
                             && (trigger == SagaTrigger.INVENTORY_RESERVED || trigger == SagaTrigger.INVENTORY_FAILED
                             || trigger == SagaTrigger.CANCEL_REQUESTED))
                             || (status == SagaStatus.ACTIVE && step == SagaStep.CHARGE_PAYMENT
-                            && (trigger == SagaTrigger.PAYMENT_SUCCESS || trigger == SagaTrigger.PAYMENT_FAILED))
+                            && (trigger == SagaTrigger.PAYMENT_SUCCESS || trigger == SagaTrigger.PAYMENT_FAILED
+                            || trigger == SagaTrigger.CANCEL_REQUESTED))
                             || (status == SagaStatus.ACTIVE && step == SagaStep.CONFIRM_ORDER
                             && trigger == SagaTrigger.ORDER_CONFIRMED)
                             || (status == SagaStatus.COMPENSATING && step == SagaStep.CANCEL_ORDER
-                            && trigger == SagaTrigger.ORDER_CANCELLED);
+                            && (trigger == SagaTrigger.ORDER_CANCELLED || trigger == SagaTrigger.INVENTORY_RELEASED
+                            || trigger == SagaTrigger.PAYMENT_REFUNDED))
+                            || (status == SagaStatus.CANCELLED && step == SagaStep.CANCELLED
+                            && (trigger == SagaTrigger.INVENTORY_RELEASED || trigger == SagaTrigger.PAYMENT_REFUNDED));
                     if (!isAllowed) {
                         assertThat(stateMachine.transition(snapshot(status, step), trigger)).isEmpty();
                     }

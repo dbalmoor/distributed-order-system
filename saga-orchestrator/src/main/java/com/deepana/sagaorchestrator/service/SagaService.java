@@ -3,12 +3,14 @@ package com.deepana.sagaorchestrator.service;
 
 import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
+import com.deepana.saga.commondto.inventory.InventoryReleasedEvent;
 import com.deepana.saga.commondto.order.OrderCreatedEvent;
 import com.deepana.saga.commondto.order.OrderCancelRequestedEvent;
 import com.deepana.saga.commondto.order.OrderCancelledEvent;
 import com.deepana.saga.commondto.order.OrderConfirmedEvent;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
+import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
 
 
 public interface SagaService {
@@ -19,9 +21,13 @@ public interface SagaService {
 
     void handleInventoryFailed(InventoryFailedEvent event, String messageId);
 
+    void handleInventoryReleased(InventoryReleasedEvent event, String messageId);
+
     void handlePaymentSuccess(PaymentSuccessEvent event, String messageId);
 
     void handlePaymentFailed(PaymentFailedEvent event, String messageId);
+
+    void handlePaymentRefunded(PaymentRefundedEvent event, String messageId);
 
     void handleCancelRequested(OrderCancelRequestedEvent event, String messageId);
 

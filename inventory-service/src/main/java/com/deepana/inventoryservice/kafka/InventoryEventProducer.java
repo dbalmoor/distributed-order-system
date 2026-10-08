@@ -1,6 +1,7 @@
 package com.deepana.inventoryservice.kafka;
 
 import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
+import com.deepana.saga.commondto.inventory.InventoryReleasedEvent;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.inventoryservice.outbox.OutboxWriter;
@@ -17,6 +18,7 @@ public class InventoryEventProducer {
 
     private static final String RESERVED_TOPIC = "inventory.reserved";
     private static final String FAILED_TOPIC = "inventory.failed";
+    private static final String RELEASED_TOPIC = "inventory.released";
 
     // ================= RESERVED =================
 
@@ -30,6 +32,10 @@ public class InventoryEventProducer {
     public void sendInventoryFailed(InventoryFailedEvent event) {
 
         send(FAILED_TOPIC, String.valueOf(event.getOrderId()), event);
+    }
+
+    public void sendInventoryReleased(InventoryReleasedEvent event) {
+        send(RELEASED_TOPIC, String.valueOf(event.getOrderId()), event);
     }
 
     // ================= COMMON SEND =================

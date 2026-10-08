@@ -2,7 +2,9 @@ package com.deepana.sagaorchestrator.service;
 
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
+import com.deepana.saga.commondto.inventory.InventoryReleasedEvent;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
+import com.deepana.saga.commondto.inventory.ReleaseInventoryCommand;
 import com.deepana.saga.commondto.inventory.ReserveInventoryCommand;
 import com.deepana.saga.commondto.order.CancelOrderCommand;
 import com.deepana.saga.commondto.order.ConfirmOrderCommand;
@@ -12,7 +14,9 @@ import com.deepana.saga.commondto.order.OrderConfirmedEvent;
 import com.deepana.saga.commondto.order.OrderCreatedEvent;
 import com.deepana.saga.commondto.payment.ChargePaymentCommand;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
+import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
+import com.deepana.saga.commondto.payment.RefundPaymentCommand;
 import com.deepana.sagaorchestrator.entity.SagaSnapshot;
 import com.deepana.sagaorchestrator.entity.SagaStatus;
 import com.deepana.sagaorchestrator.entity.SagaStep;
@@ -106,8 +110,22 @@ public class SagaServiceImpl implements SagaService {
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "inventory.failed",
                             saga.status(), transition.status(), serialize(event));
 
-                    CancelOrderCommand command = cancelCommand(event, saga.sagaId(), "INVENTORY_FAILED");
-                    producer.sendCancelOrder(command);
+                    queueCancelOrder(saga, event, "INVENTORY_FAILED");
+                }));
+    }
+
+    @Override
+    @Transactional
+    public void handleInventoryReleased(InventoryReleasedEvent event, String messageId) {
+        withTrace(event, () -> processEvent("inventory.released", event, messageId,
+                SagaTrigger.INVENTORY_RELEASED, false, (saga, transition) -> {
+                    if (!sagaRepository.hasStepEvent(saga.sagaId(), "inventory.release.cmd")) {
+                        invalid("inventory.released", "release was not requested");
+                        return;
+                    }
+                    sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "inventory.released",
+                            saga.status(), saga.status(), serialize(event));
+                    queueCancelWhenReady(saga);
                 }));
     }
 
@@ -137,8 +155,22 @@ public class SagaServiceImpl implements SagaService {
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "payment.failed",
                             saga.status(), transition.status(), serialize(event));
 
-                    // TODO(Phase 5): release reserved inventory before cancelling the order.
-                    producer.sendCancelOrder(cancelCommand(event, saga.sagaId(), "PAYMENT_FAILED"));
+                    queueInventoryRelease(saga, event);
+                }));
+    }
+
+    @Override
+    @Transactional
+    public void handlePaymentRefunded(PaymentRefundedEvent event, String messageId) {
+        withTrace(event, () -> processEvent("payment.refunded", event, messageId,
+                SagaTrigger.PAYMENT_REFUNDED, false, (saga, transition) -> {
+                    if (!sagaRepository.hasStepEvent(saga.sagaId(), "payment.refund.cmd")) {
+                        invalid("payment.refunded", "refund was not requested");
+                        return;
+                    }
+                    sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "REFUNDED",
+                            saga.status(), saga.status(), serialize(event));
+                    queueCancelWhenReady(saga);
                 }));
     }
 
@@ -151,7 +183,11 @@ public class SagaServiceImpl implements SagaService {
                             stepDeadline.toMillis());
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(),
                             "order.cancel.requested", saga.status(), transition.status(), serialize(event));
-                    producer.sendCancelOrder(cancelCommand(event, saga.sagaId(), "USER_REQUESTED"));
+                    queueInventoryRelease(saga, event);
+                    if (saga.currentStep() == SagaStep.CHARGE_PAYMENT) {
+                        queuePaymentRefund(saga, event);
+                    }
+                    queueCancelWhenReady(saga);
                 }));
     }
 
@@ -202,7 +238,12 @@ public class SagaServiceImpl implements SagaService {
                 && (saga.status() == SagaStatus.COMPENSATING || saga.status() == SagaStatus.CANCELLED)) {
             sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "LATE_SUCCESS",
                     saga.status(), saga.status(), serialize(event));
-            log.warn("Recorded late payment.success for saga {} without issuing refund (Phase 5)", saga.sagaId());
+            queuePaymentRefund(saga, event);
+            if (!sagaRepository.hasStepEvent(saga.sagaId(), "inventory.released")) {
+                queueInventoryRelease(saga, event);
+            }
+            queueCancelWhenReady(saga);
+            log.warn("Recorded late payment.success for saga {} and queued compensation", saga.sagaId());
             return;
         }
 
@@ -268,6 +309,67 @@ public class SagaServiceImpl implements SagaService {
         copyBaseFields(event, command, sagaId);
         command.setReason(reason);
         return command;
+    }
+
+    private void queueInventoryRelease(SagaSnapshot saga, BaseEvent source) {
+        if (sagaRepository.hasStepEvent(saga.sagaId(), "inventory.release.cmd")
+                || sagaRepository.hasStepEvent(saga.sagaId(), "inventory.released")) {
+            return;
+        }
+        OrderCreatedEvent order = originalOrder(saga.sagaId());
+        ReleaseInventoryCommand command = new ReleaseInventoryCommand();
+        copyBaseFields(source == null ? order : source, command, saga.sagaId());
+        command.setItems(order.getItems());
+        sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "inventory.release.cmd",
+                saga.status(), saga.status(), serialize(command));
+        producer.sendReleaseInventory(command);
+    }
+
+    private void queuePaymentRefund(SagaSnapshot saga, BaseEvent source) {
+        if (sagaRepository.hasStepEvent(saga.sagaId(), "payment.refund.cmd")
+                || sagaRepository.hasStepEvent(saga.sagaId(), "REFUNDED")) {
+            return;
+        }
+        OrderCreatedEvent order = originalOrder(saga.sagaId());
+        RefundPaymentCommand command = new RefundPaymentCommand();
+        copyBaseFields(source == null ? order : source, command, saga.sagaId());
+        command.setTotalAmount(order.getTotalAmount());
+        command.setReason("Compensation for saga " + saga.sagaId());
+        sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "payment.refund.cmd",
+                saga.status(), saga.status(), serialize(command));
+        producer.sendRefundPayment(command);
+    }
+
+    private void queueCancelOrder(SagaSnapshot saga, BaseEvent source, String reason) {
+        if (sagaRepository.hasStepEvent(saga.sagaId(), "order.cancel.cmd")) {
+            return;
+        }
+        CancelOrderCommand command = cancelCommand(source, saga.sagaId(), reason);
+        sagaRepository.appendStepLog(saga.sagaId(), saga.currentStep(), "order.cancel.cmd",
+                saga.status(), saga.status(), serialize(command));
+        producer.sendCancelOrder(command);
+    }
+
+    private void queueCancelWhenReady(SagaSnapshot saga) {
+        if (saga.status() != SagaStatus.COMPENSATING
+                || (sagaRepository.hasStepEvent(saga.sagaId(), "inventory.release.cmd")
+                && !sagaRepository.hasStepEvent(saga.sagaId(), "inventory.released"))
+                || (sagaRepository.hasStepEvent(saga.sagaId(), "payment.refund.cmd")
+                && !sagaRepository.hasStepEvent(saga.sagaId(), "REFUNDED"))) {
+            return;
+        }
+        queueCancelOrder(saga, originalOrder(saga.sagaId()), "SAGA_COMPENSATED");
+    }
+
+    private OrderCreatedEvent originalOrder(String sagaId) {
+        String payload = sagaRepository.findOrderCreatedPayload(sagaId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Original order.created payload not found for saga " + sagaId));
+        try {
+            return objectMapper.readValue(payload, OrderCreatedEvent.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Could not read original order payload for saga " + sagaId, e);
+        }
     }
 
     private void copyBaseFields(BaseEvent source, BaseEvent target, String sagaId) {

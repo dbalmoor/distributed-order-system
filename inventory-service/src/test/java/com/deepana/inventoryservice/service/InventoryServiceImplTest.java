@@ -1,7 +1,6 @@
 package com.deepana.inventoryservice.service;
 
 import com.deepana.inventoryservice.entity.Inventory;
-import com.deepana.inventoryservice.entity.ProcessedInventoryEvent;
 import com.deepana.inventoryservice.kafka.InventoryEventProducer;
 import com.deepana.inventoryservice.repository.InventoryRepository;
 import com.deepana.inventoryservice.repository.ProcessedInventoryEventRepository;
@@ -13,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -35,6 +35,9 @@ class InventoryServiceImplTest {
 
     @Mock
     private InventoryEventProducer producer;
+
+    @Mock
+    private JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private InventoryServiceImpl service;
@@ -61,9 +64,10 @@ class InventoryServiceImplTest {
         inventory.setReservedQty(0);
 
         when(processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RESERVE")).thenReturn(false);
+        when(processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RELEASED")).thenReturn(false);
         when(inventoryRepository.findByProductIdForUpdate(99L)).thenReturn(Optional.of(inventory));
         when(inventoryRepository.save(any(Inventory.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(processedRepo.save(any(ProcessedInventoryEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(processedRepo.insertIfAbsent(cmd.getSagaId(), cmd.getOrderId(), "RESERVE")).thenReturn(1);
 
         service.processReserve(cmd);
 

@@ -4,6 +4,7 @@ import com.deepana.inventoryservice.entity.Inventory;
 import com.deepana.inventoryservice.repository.InventoryRepository;
 import com.deepana.inventoryservice.service.InventoryService;
 import com.deepana.saga.commondto.inventory.ReserveInventoryCommand;
+import com.deepana.saga.commondto.inventory.ReleaseInventoryCommand;
 import com.deepana.saga.commondto.order.OrderItemEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,50 @@ class InventoryOutboxIntegrationTest extends IntegrationTestBase {
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM outbox", Long.class)).isZero();
     }
 
+    @Test
+    void releaseRestoresStockOnceAndDuplicateReleaseReemitsAcknowledgment() throws Exception {
+        Inventory inventory = inventory(10L, 8);
+        ReserveInventoryCommand reserve = command(inventory.getProductId(), 3);
+        inventoryService.processReserve(reserve);
+
+        ReleaseInventoryCommand release = releaseCommand(reserve);
+        inventoryService.processRelease(release);
+        inventoryService.processRelease(release);
+
+        assertThat(inventoryRepository.findByProductId(10L))
+                .hasValueSatisfying(updated -> {
+                    assertThat(updated.getAvailableQty()).isEqualTo(8);
+                    assertThat(updated.getReservedQty()).isZero();
+                });
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM processed_inventory_events
+                WHERE saga_id = ? AND event_type = 'RELEASED'
+                """, Long.class, reserve.getSagaId())).isEqualTo(1);
+        assertThat(outboxCount("inventory.released")).isEqualTo(2);
+    }
+
+    @Test
+    void releaseBeforeReserveWritesMarkerAndPreventsLaterStockHold() throws Exception {
+        Inventory inventory = inventory(11L, 8);
+        ReserveInventoryCommand reserve = command(inventory.getProductId(), 3);
+
+        inventoryService.processRelease(releaseCommand(reserve));
+        inventoryService.processReserve(reserve);
+
+        assertThat(inventoryRepository.findByProductId(11L))
+                .hasValueSatisfying(updated -> {
+                    assertThat(updated.getAvailableQty()).isEqualTo(8);
+                    assertThat(updated.getReservedQty()).isZero();
+                });
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM processed_inventory_events
+                WHERE saga_id = ? AND event_type = 'RELEASED'
+                """, Long.class, reserve.getSagaId())).isEqualTo(1);
+        assertThat(outboxCount("inventory.released")).isEqualTo(1);
+        assertThat(outboxCount("inventory.failed")).isEqualTo(1);
+        assertThat(outboxCount("inventory.reserved")).isZero();
+    }
+
     private Inventory inventory(Long productId, int available) {
         Inventory inventory = new Inventory();
         inventory.setProductId(productId);
@@ -99,6 +144,17 @@ class InventoryOutboxIntegrationTest extends IntegrationTestBase {
         item.setQuantity(quantity);
         item.setPrice(BigDecimal.ONE);
         command.setItems(List.of(item));
+        return command;
+    }
+
+    private ReleaseInventoryCommand releaseCommand(ReserveInventoryCommand source) {
+        ReleaseInventoryCommand command = new ReleaseInventoryCommand();
+        command.setSagaId(source.getSagaId());
+        command.setOrderId(source.getOrderId());
+        command.setOrderNumber(source.getOrderNumber());
+        command.setTraceId(source.getTraceId());
+        command.setTimestamp(source.getTimestamp());
+        command.setItems(source.getItems());
         return command;
     }
 

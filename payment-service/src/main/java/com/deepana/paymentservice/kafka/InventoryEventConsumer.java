@@ -1,8 +1,8 @@
 package com.deepana.paymentservice.kafka;
 
 import com.deepana.paymentservice.service.PaymentService;
-import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
 import com.deepana.saga.commondto.payment.ChargePaymentCommand;
+import com.deepana.saga.commondto.payment.RefundPaymentCommand;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +36,21 @@ public class InventoryEventConsumer {
 
             paymentService.processPayment(cmd);
 
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    @KafkaListener(
+            topics = "payment.refund.cmd",
+            groupId = "payment-group"
+    )
+    public void consumeRefund(String message) throws JsonProcessingException {
+        try {
+            RefundPaymentCommand cmd = objectMapper.readValue(message, RefundPaymentCommand.class);
+            MDC.put("traceId", cmd.getTraceId());
+            log.info("Received payment.refund.cmd for order {}", cmd.getOrderId());
+            paymentService.processRefund(cmd);
         } finally {
             MDC.clear();
         }

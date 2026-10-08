@@ -86,6 +86,24 @@ public class SagaRepository {
                 payload);
     }
 
+    public boolean hasStepEvent(String sagaId, String eventType) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM saga_step_log WHERE saga_id = ? AND event_type = ?
+                )
+                """, Boolean.class, sagaId, eventType));
+    }
+
+    public Optional<String> findOrderCreatedPayload(String sagaId) {
+        return jdbcTemplate.query("""
+                SELECT payload::text
+                FROM saga_step_log
+                WHERE saga_id = ? AND event_type = 'order.created'
+                ORDER BY id
+                LIMIT 1
+                """, rs -> rs.next() ? Optional.ofNullable(rs.getString(1)) : Optional.empty(), sagaId);
+    }
+
     private boolean isActive(SagaStatus status) {
         return status == SagaStatus.ACTIVE || status == SagaStatus.COMPENSATING;
     }

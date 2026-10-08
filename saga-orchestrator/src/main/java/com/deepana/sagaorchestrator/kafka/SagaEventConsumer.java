@@ -3,12 +3,14 @@ package com.deepana.sagaorchestrator.kafka;
 
 import com.deepana.saga.commondto.inventory.InventoryFailedEvent;
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
+import com.deepana.saga.commondto.inventory.InventoryReleasedEvent;
 import com.deepana.saga.commondto.order.OrderCreatedEvent;
 import com.deepana.saga.commondto.order.OrderCancelRequestedEvent;
 import com.deepana.saga.commondto.order.OrderCancelledEvent;
 import com.deepana.saga.commondto.order.OrderConfirmedEvent;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
+import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
 import com.deepana.sagaorchestrator.service.SagaService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,6 +65,17 @@ public class SagaEventConsumer {
         sagaService.handleInventoryFailed(event, messageId(record));
     }
 
+    @KafkaListener(
+            topics = "inventory.released",
+            groupId = "saga-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void onInventoryReleased(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        InventoryReleasedEvent event =
+                objectMapper.readValue(record.value(), InventoryReleasedEvent.class);
+        sagaService.handleInventoryReleased(event, messageId(record));
+    }
+
     // ---------------- PAYMENT ----------------
 
     @KafkaListener(
@@ -85,6 +98,17 @@ public class SagaEventConsumer {
         PaymentFailedEvent event =
                 objectMapper.readValue(record.value(), PaymentFailedEvent.class);
         sagaService.handlePaymentFailed(event, messageId(record));
+    }
+
+    @KafkaListener(
+            topics = "payment.refunded",
+            groupId = "saga-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void onPaymentRefunded(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        PaymentRefundedEvent event =
+                objectMapper.readValue(record.value(), PaymentRefundedEvent.class);
+        sagaService.handlePaymentRefunded(event, messageId(record));
     }
 
     @KafkaListener(
