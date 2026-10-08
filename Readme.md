@@ -6,7 +6,7 @@ Event-driven order processing with a **persisted Saga orchestrator**, **transact
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.5-green)
 ![Kafka](https://img.shields.io/badge/Apache%20Kafka-KRaft-black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Flyway-blue)
-<!-- TODO: add a CI badge once GitHub Actions runs `mvn -B verify` -->
+[![CI](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml/badge.svg)](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml)
 
 > This is a learning and portfolio project. Payment is a deterministic simulation, and several production concerns (auth, metrics, real tracing) are intentionally not built yet. See [Known limitations](#known-limitations).
 
