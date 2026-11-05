@@ -21,4 +21,4 @@
 - No auth anywhere (gateway permitAll, admin/replay endpoints open).
 - No client Idempotency-Key, no API error contract, replication factor 1.
 
-Last verified: pending full verification and commit.
+Last verified: 2026-11-05, commit 3253bf7, `mvn -B verify -DargLine=-Dnet.bytebuddy.experimental=true` BUILD SUCCESS; CI pending push.
