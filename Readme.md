@@ -260,7 +260,7 @@ Not yet covered by dedicated automated integration tests: end-to-end retry/DLT b
 - **Kafka over synchronous REST between services.** Commands are durable records, so a downstream service can be down and catch up later. For simple lookups needing an immediate answer, REST remains the better fit.
 - **Key by `orderId`.** Preserves per-order ordering while allowing parallelism across partitions.
 - **Tolerate duplicates instead of chasing exactly-once.** At-least-once delivery plus idempotent handlers is simpler and honest about what Kafka guarantees here.
-- **Pessimistic lock on inventory, optimistic version on orders and sagas.** See limitations for the inventory trade-off.
+- **Atomic conditional inventory updates**, with optimistic versions on orders and sagas.
 
 ## Known limitations
 
@@ -268,7 +268,7 @@ This section is deliberate; these are known gaps, not oversights.
 
 - **No authentication or authorization.** The gateway permits all requests; admin and DLT-replay endpoints are unauthenticated and not routed through the gateway. Do not expose service ports publicly.
 - **Payment is a simulation**, not a real provider.
-- **Inventory reservation** loads the product row `FOR UPDATE`, checks quantity, then saves. An atomic conditional decrement would reduce contention on hot rows.
+- **Inventory contention:** each item is reserved with an atomic conditional update in ascending product-ID order. A concurrency integration test verifies 50 competing commands against stock of 10 produce exactly 10 reservations and 40 failures without overselling.
 - **Observability:** MDC correlation via `traceId` only. No OpenTelemetry tracing, Prometheus metrics, or Grafana dashboard.
 - **No client `Idempotency-Key`** on `POST /orders`: a client retry can create a second order.
 - **No standardized API validation or error contract.**

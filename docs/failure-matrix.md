@@ -18,6 +18,8 @@
 | Refund before charge | `REFUNDED` marker makes the later charge fail | No charge | Race test | `PaymentIdempotencyIntegrationTest#refundBeforeChargeCreatesMarkerAndRejectsLaterCharge` |
 | Cancel request after the pivot | Rejected; order continues to `COMPLETED` | Order `COMPLETED` | Cancel-too-late test | `SagaPersistenceIntegrationTest#cancelRequestsBeforePivotWaitForRequiredCompensationAcknowledgments` |
 | Poison message | Routed to the DLT, replayed after review | Consumer not blocked | DLT test | NO TEST |
+| Concurrent reservations for the last units | Atomic conditional update; losers get `inventory.failed` | Never oversold, stock never negative | Oversell test | `InventoryOutboxIntegrationTest#concurrentReservationsNeverOversellLimitedStock` (50 commands, stock 10: 10 succeed, 40 fail) |
+| Multi-item reservation failure | Later item is unavailable; earlier stock is restored and failure is recorded | No partial reservation; `inventory.failed` and failure marker committed | Multi-item failure test | `InventoryOutboxIntegrationTest#multiItemReservationFailureRestoresEarlierStockAndCommitsFailure` |
 
 ## Rows without automated test coverage
 

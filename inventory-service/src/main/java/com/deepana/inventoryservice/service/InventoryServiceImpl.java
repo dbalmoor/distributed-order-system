@@ -1,7 +1,6 @@
 package com.deepana.inventoryservice.service;
 
 import com.deepana.inventoryservice.common.logging.SagaLogger;
-import com.deepana.inventoryservice.entity.Inventory;
 import com.deepana.inventoryservice.kafka.InventoryEventProducer;
 import com.deepana.inventoryservice.repository.InventoryRepository;
 
@@ -16,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -45,35 +45,34 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         // 1️⃣ Idempotency check
-        if (processedRepo.existsBySagaIdAndEventType(
-                cmd.getSagaId(), "RESERVE")) {
+        if (processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RESERVE")
+                || processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RESERVE_FAILED")) {
 
             log.info("Reserve already processed for saga {}", cmd.getSagaId());
             return;
         }
 
-        List<Inventory> lockedInventory = new ArrayList<>();
-        for (OrderItemEvent item : cmd.getItems()) {
-            Inventory inventory = inventoryRepository
-                    .findByProductIdForUpdate(item.getProductId())
-                    .orElse(null);
-            if (inventory == null) {
-                emitReserveFailure(cmd, "Product not found: " + item.getProductId());
+        List<OrderItemEvent> items = cmd.getItems().stream()
+                .sorted(Comparator.comparing(OrderItemEvent::getProductId))
+                .toList();
+        List<OrderItemEvent> reservedItems = new ArrayList<>();
+        for (OrderItemEvent item : items) {
+            if (inventoryRepository.reserveStock(item.getProductId(), item.getQuantity()) != 1) {
+                for (OrderItemEvent reservedItem : reservedItems) {
+                    if (inventoryRepository.releaseReservation(
+                            reservedItem.getProductId(), reservedItem.getQuantity()) != 1) {
+                        throw new IllegalStateException(
+                                "Could not roll back partial reservation for product "
+                                        + reservedItem.getProductId());
+                    }
+                }
+                String reason = inventoryRepository.existsByProductId(item.getProductId())
+                        ? "Insufficient stock for product " + item.getProductId()
+                        : "Product not found: " + item.getProductId();
+                emitReserveFailure(cmd, reason);
                 return;
             }
-            if (inventory.getAvailableQty() < item.getQuantity()) {
-                emitReserveFailure(cmd, "Insufficient stock for product " + item.getProductId());
-                return;
-            }
-            lockedInventory.add(inventory);
-        }
-
-        for (int i = 0; i < cmd.getItems().size(); i++) {
-            OrderItemEvent item = cmd.getItems().get(i);
-            Inventory inventory = lockedInventory.get(i);
-            inventory.setAvailableQty(inventory.getAvailableQty() - item.getQuantity());
-            inventory.setReservedQty(inventory.getReservedQty() + item.getQuantity());
-            inventoryRepository.save(inventory);
+            reservedItems.add(item);
         }
 
         if (processedRepo.insertIfAbsent(cmd.getSagaId(), orderId, "RESERVE") != 1) {
@@ -90,11 +89,15 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     private void emitReserveFailure(ReserveInventoryCommand cmd, String reason) {
-            InventoryFailedEvent failedEvent = new InventoryFailedEvent();
-            copyBaseFields(cmd, failedEvent);
-            failedEvent.setReason(reason);
-            producer.sendInventoryFailed(failedEvent);
-            SagaLogger.failed("INVENTORY", String.valueOf(cmd.getOrderId()), "FAILED_EVENT_PUBLISHED");
+        if (processedRepo.insertIfAbsent(cmd.getSagaId(), cmd.getOrderId(), "RESERVE_FAILED") != 1) {
+            log.info("Reserve failure already processed for saga {}", cmd.getSagaId());
+            return;
+        }
+        InventoryFailedEvent failedEvent = new InventoryFailedEvent();
+        copyBaseFields(cmd, failedEvent);
+        failedEvent.setReason(reason);
+        producer.sendInventoryFailed(failedEvent);
+        SagaLogger.failed("INVENTORY", String.valueOf(cmd.getOrderId()), "FAILED_EVENT_PUBLISHED");
     }
 
 

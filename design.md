@@ -203,10 +203,10 @@ These endpoints are unauthenticated and not routed through the gateway.
   `RELEASED` marker to guard compensating release and late reserve.
 - `saga-orchestrator` uses `processed_message` and locks saga rows while
   handling events. The version column is an additional consistency check.
-- Inventory reservation currently loads the product row using
-  `InventoryRepository.findByProductIdForUpdate`, checks available quantity,
-  then saves the row. The conditional SQL update is used for release. It is not
-  currently the atomic conditional decrement proposal.
+- Inventory reservation uses an atomic conditional update per item, in ascending
+  product-ID order. If an item cannot be reserved, earlier item updates are
+  restored in the same transaction before the failure marker and outbox event
+  are committed. The inventory `version` is incremented by the update.
 
 ## 6. Deadlines and stuck saga recovery
 

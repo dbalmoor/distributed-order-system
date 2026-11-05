@@ -1,6 +1,5 @@
 package com.deepana.inventoryservice.service;
 
-import com.deepana.inventoryservice.entity.Inventory;
 import com.deepana.inventoryservice.kafka.InventoryEventProducer;
 import com.deepana.inventoryservice.repository.InventoryRepository;
 import com.deepana.inventoryservice.repository.ProcessedInventoryEventRepository;
@@ -16,7 +15,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -57,16 +55,10 @@ class InventoryServiceImplTest {
         item.setPrice(new BigDecimal("9.99"));
         cmd.setItems(List.of(item));
 
-        Inventory inventory = new Inventory();
-        inventory.setId(1L);
-        inventory.setProductId(99L);
-        inventory.setAvailableQty(5);
-        inventory.setReservedQty(0);
-
         when(processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RESERVE")).thenReturn(false);
         when(processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RELEASED")).thenReturn(false);
-        when(inventoryRepository.findByProductIdForUpdate(99L)).thenReturn(Optional.of(inventory));
-        when(inventoryRepository.save(any(Inventory.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RESERVE_FAILED")).thenReturn(false);
+        when(inventoryRepository.reserveStock(99L, 2)).thenReturn(1);
         when(processedRepo.insertIfAbsent(cmd.getSagaId(), cmd.getOrderId(), "RESERVE")).thenReturn(1);
 
         service.processReserve(cmd);

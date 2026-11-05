@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted in the design; implementation gap documented below
+Accepted
 
 ## Context
 
@@ -10,12 +10,14 @@ Concurrent reservations must not oversell a product. A lock or version counter a
 
 ## Decision
 
-R16 selects an atomic conditional update as the canonical oversell guard, equivalent to `UPDATE inventory SET available = available - :qty WHERE product_id = :id AND available >= :qty`. A pessimistic lock may remain as a fallback when stronger locking is needed. `@Version` may remain for optimistic-lock detection, but does not replace the conditional update as the primary guard.
+Reserve each order item with one atomic conditional update:
+`UPDATE inventory SET available_qty = available_qty - :qty, reserved_qty = reserved_qty + :qty WHERE product_id = :id AND available_qty >= :qty`.
+Process items in ascending product ID order. If any item cannot be reserved, restore the earlier item updates in the same transaction, then commit the failure marker and `inventory.failed` outbox row. The `version` column is incremented by the update.
 
 ## Consequences
 
-When implemented for reservation, the stock check and decrement will be one database operation. **Current implementation differs:** `InventoryServiceImpl.processReserve` loads each row through `InventoryRepository.findByProductIdForUpdate`, checks `availableQty`, and saves the entity. `InventoryRepository.releaseReservation` is a conditional SQL update for release, not reservation. This discrepancy is not represented as an implemented R16 decision.
+The stock-availability check and decrement happen atomically at the database. Sorting product IDs avoids inconsistent row-lock order across multi-item reservations. The integration test races 50 distinct reservations against stock of 10 and verifies exactly 10 reservations succeed without a negative balance.
 
 ## Rejected alternatives
 
-Using `@Version` as the sole oversell-prevention mechanism was rejected; it does not replace the atomic conditional update.
+Using `@Version` as the sole oversell-prevention mechanism was rejected; it detects concurrent changes but does not itself enforce the availability condition in the update.
