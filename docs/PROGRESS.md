@@ -8,17 +8,16 @@
 | 4 Persistent saga state | Done | saga_instance, saga_step_log |
 | 5 Compensation, timeouts, watchdog | Done | NEEDS_ATTENTION + admin retry/force-resolve |
 | 6 Retry topics, DLT, replay | Done | tag v0.6-phase6; no automated retry/DLT/replay tests |
-| 7a Metrics + log correlation | Not started | |
-| 7b OpenTelemetry tracing | Not started | optional |
+| 7a Metrics + log correlation | Done | Verified 2026-11-10; `mvn -B verify` on JDK 17: 58 tests, 0 failures; success and failure walkthroughs + Prometheus screenshots in [evidence](evidence/order-120-e2e-2026-11-10.md) |
+| 7b OpenTelemetry tracing | Skipped | Not implemented |
 | 8 README, ADRs, failure matrix | Done | refresh after Phase 7 |
 
 ## Next (in order)
-1. Phase 7a (metrics + log correlation).
-2. Phase 7b only if time allows.
+No further Phase 7 work planned.
 
 ## Known gaps (keep README in sync)
 - No tests: orchestrator crash/restart, duplicate inventory.reserve.cmd, poison-to-DLT and replay (DLT checked manually).
 - No auth anywhere (gateway permitAll, admin/replay endpoints open).
 - No client Idempotency-Key, no API error contract, replication factor 1.
 
-Last verified: 2026-11-05, commit 3253bf7, `mvn -B verify -DargLine=-Dnet.bytebuddy.experimental=true` BUILD SUCCESS.
+Last full build verification: 2026-11-10, `mvn -B verify` on JDK 17 — BUILD SUCCESS (58 tests, 0 failures). Phase 7a runtime evidence: [order 120 success](evidence/order-120-e2e-2026-11-10.md) and [order 121 failure](evidence/order-121-failure-2026-11-10.md). Changes remain uncommitted; no CI run was checked.

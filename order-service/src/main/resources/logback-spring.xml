@@ -7,7 +7,7 @@
 
         <encoder>
             <pattern>
-                %d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger - %msg%n
+                %d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] [sagaId=%X{sagaId}] [orderId=%X{orderId}] [messageId=%X{messageId}] [eventType=%X{eventType}] %logger - %msg%n
             </pattern>
         </encoder>
 
@@ -32,7 +32,7 @@
         </rollingPolicy>
 
         <encoder>
-            <pattern>%msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] [sagaId=%X{sagaId}] [orderId=%X{orderId}] [messageId=%X{messageId}] [eventType=%X{eventType}] %logger - %msg%n</pattern>
         </encoder>
 
     </appender>

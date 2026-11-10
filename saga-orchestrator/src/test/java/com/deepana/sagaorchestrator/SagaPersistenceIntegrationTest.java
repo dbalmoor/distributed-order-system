@@ -16,6 +16,7 @@ import com.deepana.sagaorchestrator.outbox.OutboxTransactions;
 import com.deepana.sagaorchestrator.service.SagaService;
 import com.deepana.sagaorchestrator.service.SagaServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -57,6 +58,7 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
     @Autowired private OutboxTransactions outboxTransactions;
     @Autowired private KafkaTemplate<String, String> kafkaTemplate;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private MeterRegistry meterRegistry;
 
     @BeforeEach
     void clearSagaData() {
@@ -68,6 +70,7 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
 
     @Test
     void happyPathCompletesOnlyAfterOrderConfirmed() {
+        double completedBefore = meterRegistry.counter("saga.completed").count();
         OrderCreatedEvent created = order(1001L);
         start(created);
         String sagaId = sagaId(created.getOrderId());
@@ -80,6 +83,8 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
 
         sagaService.handleOrderConfirmed(confirmed(created, sagaId), messageId());
         assertState(created.getOrderId(), "COMPLETED", "COMPLETED");
+        assertThat(meterRegistry.counter("saga.completed").count() - completedBefore).isEqualTo(1.0);
+        assertThat(meterRegistry.get("saga.needs_attention").gauge().value()).isZero();
     }
 
     @Test

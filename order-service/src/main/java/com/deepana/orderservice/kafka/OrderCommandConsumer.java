@@ -6,10 +6,13 @@ import com.deepana.saga.commondto.order.ConfirmOrderCommand;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.deepana.saga.commondto.base.BaseEvent;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.errors.RetriableException;
+import org.slf4j.MDC;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.kafka.annotation.DltHandler;
@@ -33,6 +36,7 @@ public class OrderCommandConsumer {
 
     private final OrderService orderService;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     @RetryableTopic(
             attempts = "4",
@@ -46,6 +50,11 @@ public class OrderCommandConsumer {
             autoCreateTopics = "false",
             topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE)
     @KafkaListener(topics = "order.confirm.cmd", groupId = "${spring.kafka.consumer.group-id}")
+    public void onConfirmRecord(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        ConfirmOrderCommand command = objectMapper.readValue(record.value(), ConfirmOrderCommand.class);
+        withMdc(record, command, "order.confirm.cmd", () -> orderService.confirmOrder(command));
+    }
+
     public void onConfirm(String message) throws JsonProcessingException {
         ConfirmOrderCommand command = objectMapper.readValue(message, ConfirmOrderCommand.class);
         orderService.confirmOrder(command);
@@ -63,6 +72,11 @@ public class OrderCommandConsumer {
             autoCreateTopics = "false",
             topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE)
     @KafkaListener(topics = "order.cancel.cmd", groupId = "${spring.kafka.consumer.group-id}")
+    public void onCancelRecord(ConsumerRecord<String, String> record) throws JsonProcessingException {
+        CancelOrderCommand command = objectMapper.readValue(record.value(), CancelOrderCommand.class);
+        withMdc(record, command, "order.cancel.cmd", () -> orderService.cancelBySaga(command));
+    }
+
     public void onCancel(String message) throws JsonProcessingException {
         CancelOrderCommand command = objectMapper.readValue(message, CancelOrderCommand.class);
         orderService.cancelBySaga(command);
@@ -70,6 +84,7 @@ public class OrderCommandConsumer {
 
     @DltHandler
     public void onDeadLetter(ConsumerRecord<String, String> record) {
+        meterRegistry.counter("kafka.dlt.messages", "topic", record.topic()).increment();
         JsonNode payload = dltPayload(record);
         log.error("DLT topic={} sagaId={} orderId={} messageId={} failure={} payload={}",
                 record.topic(), first(header(record, "sagaId"), payload.path("sagaId").asText(null)),
@@ -105,5 +120,25 @@ public class OrderCommandConsumer {
     private String header(ConsumerRecord<String, String> record, String name) {
         var header = record.headers().lastHeader(name);
         return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+    }
+
+    private void withMdc(ConsumerRecord<String, String> record, BaseEvent event, String eventType, Runnable action) {
+        putMdc("sagaId", first(header(record, "sagaId"), event.getSagaId()));
+        putMdc("orderId", first(header(record, "orderId"),
+                event.getOrderId() == null ? null : event.getOrderId().toString(), record.key()));
+        putMdc("messageId", first(header(record, "messageId"), messageId(record)));
+        putMdc("eventType", first(header(record, "eventType"), eventType));
+        putMdc("traceId", event.getTraceId());
+        try {
+            action.run();
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    private void putMdc(String key, String value) {
+        if (value != null && !value.isBlank()) {
+            MDC.put(key, value);
+        }
     }
 }

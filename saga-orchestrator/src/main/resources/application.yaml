@@ -44,13 +44,15 @@ logging:
   level:
     root: INFO
     com.deepana: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] [sagaId=%X{sagaId}] [orderId=%X{orderId}] [messageId=%X{messageId}] [eventType=%X{eventType}] %logger - %msg%n"
 
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 saga:
   deadlines:

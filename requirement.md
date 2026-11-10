@@ -34,6 +34,10 @@ Add Micrometer/Prometheus metrics for saga outcomes, step latency, outbox
 backlog, consumer lag, retry/DLT counts, and duplicate-event counts. Provide a
 Grafana dashboard.
 
+**Status:** Phase 7a metrics and local Prometheus scraping are implemented and
+verified; step-latency/consumer-lag coverage and the Grafana dashboard remain
+open.
+
 **Acceptance:** a dashboard or documented walkthrough demonstrates a normal
 flow and a failure/recovery flow using those metrics.
 

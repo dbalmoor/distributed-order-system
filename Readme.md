@@ -8,7 +8,7 @@ Event-driven order processing with a **persisted Saga orchestrator**, **transact
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Flyway-blue)
 [![CI](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml/badge.svg)](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml)
 
-> This is a learning and portfolio project. Payment is a deterministic simulation, and several production concerns (auth, metrics, real tracing) are intentionally not built yet. See [Known limitations](#known-limitations).
+> This is a learning and portfolio project. Payment is a deterministic simulation, and several production concerns (auth, dashboards, and distributed tracing) are intentionally not built yet. See [Known limitations](#known-limitations).
 
 ---
 
@@ -199,7 +199,7 @@ Every operator action is recorded in `saga_step_log`.
 
 ```bash
 # 1. Start Kafka (KRaft) and the service databases
-docker compose -f up -d
+docker compose up -d
 
 # 2. Build and run all tests (Testcontainers needs Docker running)
 mvn -B verify
@@ -210,6 +210,8 @@ mvn -pl inventory-service spring-boot:run
 mvn -pl payment-service spring-boot:run
 mvn -pl saga-orchestrator spring-boot:run
 ```
+
+On first startup, Flyway seeds inventory products 1, 2, and 3 with 100 units each. Existing product stock is preserved.
 
 Create an order:
 
@@ -269,7 +271,7 @@ This section is deliberate; these are known gaps, not oversights.
 - **No authentication or authorization.** The gateway permits all requests; admin and DLT-replay endpoints are unauthenticated and not routed through the gateway. Do not expose service ports publicly.
 - **Payment is a simulation**, not a real provider.
 - **Inventory contention:** each item is reserved with an atomic conditional update in ascending product-ID order. A concurrency integration test verifies 50 competing commands against stock of 10 produce exactly 10 reservations and 40 failures without overselling.
-- **Observability:** MDC correlation via `traceId` only. No OpenTelemetry tracing, Prometheus metrics, or Grafana dashboard.
+- **Observability:** Prometheus metrics via Micrometer (saga, outbox and duplicate counters); no Grafana dashboards or alerting; no OpenTelemetry tracing; Actuator endpoints are unauthenticated.
 - **No client `Idempotency-Key`** on `POST /orders`: a client retry can create a second order.
 - **No standardized API validation or error contract.**
 - **No schema registry**, and no chaos or fault-injection harness.
@@ -280,6 +282,28 @@ Planned work is tracked in [requirement.md](requirement.md).
 ## Tech stack
 
 Java 17, Spring Boot 3.2.5, Spring Kafka, Spring Data JPA / Hibernate, PostgreSQL, Flyway, Apache Kafka (KRaft), Maven (multi-module), Testcontainers, Docker Compose.
+
+## Observability
+
+The four business services expose Micrometer metrics in Prometheus format at
+`/actuator/prometheus`. Available metrics include saga outcomes and
+`saga.needs_attention`, outbox backlog/publication, duplicate deliveries, and
+Kafka DLT messages. Actuator endpoints are currently unauthenticated; no
+Grafana dashboards or OpenTelemetry tracing are implemented.
+
+The local happy-path walkthrough is documented in
+[order 120 end-to-end evidence](docs/evidence/order-120-e2e-2026-11-10.md).
+
+## Evidence
+
+- [Successful order 120 walkthrough](docs/evidence/order-120-e2e-2026-11-10.md)
+- [Cancelled order 121 failure walkthrough](docs/evidence/order-121-failure-2026-11-10.md)
+- [Inventory oversell integration test](inventory-service/src/test/java/com/deepana/inventoryservice/InventoryOutboxIntegrationTest.java#L172): 50 concurrent commands against stock 10; 10 reserved and 40 rejected.
+- [GitHub Actions CI workflow and runs](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml)
+- Prometheus targets screenshot:
+  ![All four Prometheus service targets are UP](docs/evidence/prometheus-targets-2026-11-10.png)
+- Prometheus `saga_completed_total` screenshot:
+  ![Prometheus reports one completed saga](docs/evidence/prometheus-saga-completed-2026-11-10.png)
 
 ## Further reading
 

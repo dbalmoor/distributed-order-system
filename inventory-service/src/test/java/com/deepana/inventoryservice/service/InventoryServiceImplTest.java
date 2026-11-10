@@ -6,6 +6,7 @@ import com.deepana.inventoryservice.repository.ProcessedInventoryEventRepository
 import com.deepana.saga.commondto.inventory.InventoryReservedEvent;
 import com.deepana.saga.commondto.inventory.ReserveInventoryCommand;
 import com.deepana.saga.commondto.order.OrderItemEvent;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +37,9 @@ class InventoryServiceImplTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
+
+    @Mock
+    private MeterRegistry meterRegistry;
 
     @InjectMocks
     private InventoryServiceImpl service;

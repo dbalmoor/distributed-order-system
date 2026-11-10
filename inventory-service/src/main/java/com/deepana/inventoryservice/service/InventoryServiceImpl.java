@@ -8,6 +8,7 @@ import com.deepana.inventoryservice.repository.ProcessedInventoryEventRepository
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.saga.commondto.inventory.*;
 import com.deepana.saga.commondto.order.OrderItemEvent;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.jdbc.core.JdbcTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ import java.util.List;
 public class InventoryServiceImpl implements InventoryService {
 
     private final ProcessedInventoryEventRepository processedRepo;
+    private final MeterRegistry meterRegistry;
 
     private final InventoryRepository inventoryRepository;
     private final InventoryEventProducer producer;
@@ -48,6 +50,7 @@ public class InventoryServiceImpl implements InventoryService {
         if (processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RESERVE")
                 || processedRepo.existsBySagaIdAndEventType(cmd.getSagaId(), "RESERVE_FAILED")) {
 
+            meterRegistry.counter("inventory.duplicate").increment();
             log.info("Reserve already processed for saga {}", cmd.getSagaId());
             return;
         }
@@ -107,6 +110,7 @@ public class InventoryServiceImpl implements InventoryService {
 
         lockSaga(cmd.getSagaId());
         if (processedRepo.insertIfAbsent(cmd.getSagaId(), cmd.getOrderId(), "RELEASED") == 0) {
+            meterRegistry.counter("inventory.duplicate").increment();
             log.info("Release already processed for saga {}", cmd.getSagaId());
             emitReleased(cmd);
             return;

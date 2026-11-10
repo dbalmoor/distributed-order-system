@@ -76,6 +76,13 @@ public class SagaRepository {
                 rs.getTimestamp("last_heartbeat_at").toInstant()));
     }
 
+    public long countNeedingAttention() {
+        return jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM saga_instance
+                WHERE status = 'NEEDS_ATTENTION' AND needs_attention = TRUE
+                """, Long.class);
+    }
+
     public void updateState(String sagaId, SagaStatus status, SagaStep step, long deadlineMillis) {
         int updated = jdbcTemplate.update("""
                 UPDATE saga_instance

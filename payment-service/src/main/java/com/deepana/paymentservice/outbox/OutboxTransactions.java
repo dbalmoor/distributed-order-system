@@ -1,6 +1,9 @@
 package com.deepana.paymentservice.outbox;
 
 import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +16,20 @@ import java.util.UUID;
 public class OutboxTransactions {
 
     private final JdbcTemplate jdbcTemplate;
+    private final MeterRegistry meterRegistry;
+
+    @PostConstruct
+    void registerMetrics() {
+        Gauge.builder("outbox.pending", this, OutboxTransactions::pendingCount)
+                .description("Outbox rows awaiting publication")
+                .register(meterRegistry);
+    }
+
+    public long pendingCount() {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM outbox WHERE status IN ('NEW', 'IN_PROGRESS')",
+                Long.class);
+    }
 
     @Transactional
     public List<OutboxMessage> claim(int batchSize, long leaseMillis) {
@@ -73,6 +90,7 @@ public class OutboxTransactions {
         if (updated != 1) {
             throw new IllegalStateException("Outbox row is no longer claimed: " + messageId);
         }
+        meterRegistry.counter("outbox.published").increment();
     }
 
     @Transactional
@@ -86,5 +104,6 @@ public class OutboxTransactions {
         if (updated != 1) {
             throw new IllegalStateException("Outbox row is no longer claimed: " + messageId);
         }
+        meterRegistry.counter("outbox.publish.failures").increment();
     }
 }

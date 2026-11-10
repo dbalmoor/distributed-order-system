@@ -11,14 +11,17 @@ import com.deepana.saga.commondto.order.OrderConfirmedEvent;
 import com.deepana.saga.commondto.payment.PaymentFailedEvent;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
 import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
+import com.deepana.saga.commondto.base.BaseEvent;
 import com.deepana.sagaorchestrator.service.SagaService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.errors.RetriableException;
+import org.slf4j.MDC;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -43,6 +46,7 @@ public class SagaEventConsumer {
 
     private final SagaService sagaService;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     // ---------------- ORDER ----------------
 
@@ -64,7 +68,7 @@ public class SagaEventConsumer {
     )
     public void onOrderCreated(ConsumerRecord<String, String> record) throws JsonProcessingException {
         OrderCreatedEvent event = objectMapper.readValue(record.value(), OrderCreatedEvent.class);
-        sagaService.handleOrderCreated(event, messageId(record));
+        withMdc(record, event, () -> sagaService.handleOrderCreated(event, messageId(record)));
     }
 
     // ---------------- INVENTORY ----------------
@@ -88,7 +92,7 @@ public class SagaEventConsumer {
     public void onInventoryReserved(ConsumerRecord<String, String> record) throws JsonProcessingException {
         InventoryReservedEvent event =
                 objectMapper.readValue(record.value(), InventoryReservedEvent.class);
-        sagaService.handleInventoryReserved(event, messageId(record));
+        withMdc(record, event, () -> sagaService.handleInventoryReserved(event, messageId(record)));
     }
 
     @RetryableTopic(
@@ -110,7 +114,7 @@ public class SagaEventConsumer {
     public void onInventoryFailed(ConsumerRecord<String, String> record) throws JsonProcessingException {
         InventoryFailedEvent event =
                 objectMapper.readValue(record.value(), InventoryFailedEvent.class);
-        sagaService.handleInventoryFailed(event, messageId(record));
+        withMdc(record, event, () -> sagaService.handleInventoryFailed(event, messageId(record)));
     }
 
     @RetryableTopic(
@@ -132,7 +136,7 @@ public class SagaEventConsumer {
     public void onInventoryReleased(ConsumerRecord<String, String> record) throws JsonProcessingException {
         InventoryReleasedEvent event =
                 objectMapper.readValue(record.value(), InventoryReleasedEvent.class);
-        sagaService.handleInventoryReleased(event, messageId(record));
+        withMdc(record, event, () -> sagaService.handleInventoryReleased(event, messageId(record)));
     }
 
     // ---------------- PAYMENT ----------------
@@ -156,7 +160,7 @@ public class SagaEventConsumer {
     public void onPaymentSuccess(ConsumerRecord<String, String> record) throws JsonProcessingException {
         PaymentSuccessEvent event =
                 objectMapper.readValue(record.value(), PaymentSuccessEvent.class);
-        sagaService.handlePaymentSuccess(event, messageId(record));
+        withMdc(record, event, () -> sagaService.handlePaymentSuccess(event, messageId(record)));
     }
 
     @RetryableTopic(
@@ -178,7 +182,7 @@ public class SagaEventConsumer {
     public void onPaymentFailed(ConsumerRecord<String, String> record) throws JsonProcessingException {
         PaymentFailedEvent event =
                 objectMapper.readValue(record.value(), PaymentFailedEvent.class);
-        sagaService.handlePaymentFailed(event, messageId(record));
+        withMdc(record, event, () -> sagaService.handlePaymentFailed(event, messageId(record)));
     }
 
     @RetryableTopic(
@@ -200,7 +204,7 @@ public class SagaEventConsumer {
     public void onPaymentRefunded(ConsumerRecord<String, String> record) throws JsonProcessingException {
         PaymentRefundedEvent event =
                 objectMapper.readValue(record.value(), PaymentRefundedEvent.class);
-        sagaService.handlePaymentRefunded(event, messageId(record));
+        withMdc(record, event, () -> sagaService.handlePaymentRefunded(event, messageId(record)));
     }
 
     @RetryableTopic(
@@ -222,7 +226,7 @@ public class SagaEventConsumer {
     public void onOrderCancelRequested(ConsumerRecord<String, String> record) throws JsonProcessingException {
         OrderCancelRequestedEvent event =
                 objectMapper.readValue(record.value(), OrderCancelRequestedEvent.class);
-        sagaService.handleCancelRequested(event, messageId(record));
+        withMdc(record, event, () -> sagaService.handleCancelRequested(event, messageId(record)));
     }
 
     @RetryableTopic(
@@ -245,10 +249,10 @@ public class SagaEventConsumer {
         String messageId = messageId(record);
         if ("order.confirmed".equals(record.topic())) {
             OrderConfirmedEvent event = objectMapper.readValue(record.value(), OrderConfirmedEvent.class);
-            sagaService.handleOrderConfirmed(event, messageId);
+            withMdc(record, event, () -> sagaService.handleOrderConfirmed(event, messageId));
         } else {
             OrderCancelledEvent event = objectMapper.readValue(record.value(), OrderCancelledEvent.class);
-            sagaService.handleOrderCancelled(event, messageId);
+            withMdc(record, event, () -> sagaService.handleOrderCancelled(event, messageId));
         }
     }
 
@@ -263,6 +267,7 @@ public class SagaEventConsumer {
 
     @DltHandler
     public void onDeadLetter(ConsumerRecord<String, String> record) {
+        meterRegistry.counter("kafka.dlt.messages", "topic", record.topic()).increment();
         JsonNode payload;
         try {
             payload = objectMapper.readTree(record.value());
@@ -271,12 +276,17 @@ public class SagaEventConsumer {
                     record.topic(), record.partition(), record.offset(), e);
             payload = objectMapper.createObjectNode();
         }
-        log.error("DLT topic={} sagaId={} orderId={} messageId={} failure={} payload={}",
-                record.topic(), first(header(record, "sagaId"), payload.path("sagaId").asText(null)),
-                first(header(record, "orderId"), payload.path("orderId").asText(null), record.key()),
-                first(header(record, "messageId"), messageIdForDlt(record)),
-                header(record, "kafka_dlt-exception-message"),
-                record.value());
+        putMdc("sagaId", first(header(record, "sagaId"), payload.path("sagaId").asText(null)));
+        putMdc("orderId", first(header(record, "orderId"), payload.path("orderId").asText(null), record.key()));
+        putMdc("messageId", first(header(record, "messageId"), messageIdForDlt(record)));
+        putMdc("eventType", first(header(record, "eventType"), record.topic()));
+        try {
+            log.error("DLT topic={} sagaId={} orderId={} messageId={} failure={} payload={}",
+                    record.topic(), MDC.get("sagaId"), MDC.get("orderId"), MDC.get("messageId"),
+                    header(record, "kafka_dlt-exception-message"), record.value());
+        } finally {
+            MDC.clear();
+        }
     }
 
     private String messageIdForDlt(ConsumerRecord<String, String> record) {
@@ -295,5 +305,25 @@ public class SagaEventConsumer {
     private String header(ConsumerRecord<String, String> record, String name) {
         Header header = record.headers().lastHeader(name);
         return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+    }
+
+    private void withMdc(ConsumerRecord<String, String> record, BaseEvent event, Runnable action) {
+        putMdc("sagaId", first(header(record, "sagaId"), event.getSagaId()));
+        putMdc("orderId", first(header(record, "orderId"),
+                event.getOrderId() == null ? null : event.getOrderId().toString(), record.key()));
+        putMdc("messageId", first(header(record, "messageId"), messageId(record)));
+        putMdc("eventType", first(header(record, "eventType"), record.topic()));
+        putMdc("traceId", event.getTraceId());
+        try {
+            action.run();
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    private void putMdc(String key, String value) {
+        if (value != null && !value.isBlank()) {
+            MDC.put(key, value);
+        }
     }
 }

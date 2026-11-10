@@ -3,9 +3,11 @@ package com.deepana.inventoryservice.kafka;
 import com.deepana.inventoryservice.service.InventoryService;
 import com.deepana.saga.commondto.inventory.ReleaseInventoryCommand;
 import com.deepana.saga.commondto.inventory.ReserveInventoryCommand;
+import com.deepana.saga.commondto.base.BaseEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.errors.RetriableException;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class InventoryCommandConsumer {
 
     private final ObjectMapper objectMapper;
     private final InventoryService inventoryService;
+    private final MeterRegistry meterRegistry;
 
     @RetryableTopic(
             attempts = "4",
@@ -50,26 +53,21 @@ public class InventoryCommandConsumer {
             topics = "inventory.reserve.cmd",
             groupId = "${spring.kafka.consumer.group-id}"
     )
-    public void consumeReserveCommand(String message) {
-
+    public void consumeReserveCommand(ConsumerRecord<String, String> record) {
         try {
-
             ReserveInventoryCommand cmd =
-                    objectMapper.readValue(message, ReserveInventoryCommand.class);
-
-            MDC.put("traceId", cmd.getTraceId());
-
-            log.info("Received inventory.reserve.cmd: {}", cmd.getOrderId());
-
-            inventoryService.processReserve(cmd);
-
+                    objectMapper.readValue(record.value(), ReserveInventoryCommand.class);
+            withMdc(record, cmd, "inventory.reserve.cmd", () -> {
+                log.info("Received inventory.reserve.cmd: {}", cmd.getOrderId());
+                try {
+                    inventoryService.processReserve(cmd);
+                } catch (JsonProcessingException exception) {
+                    throw new IllegalStateException("Inventory reservation failed", exception);
+                }
+            });
         } catch (Exception e) {
-
             log.error("Inventory processing failed", e);
             throw new RuntimeException(e);
-
-        } finally {
-            MDC.clear();
         }
     }
 
@@ -88,31 +86,23 @@ public class InventoryCommandConsumer {
             topics = "inventory.release.cmd",
             groupId = "${spring.kafka.consumer.group-id}"
     )
-    public void consumeReleaseCommand(String message) {
-
+    public void consumeReleaseCommand(ConsumerRecord<String, String> record) {
         try {
-
             ReleaseInventoryCommand cmd =
-                    objectMapper.readValue(message, ReleaseInventoryCommand.class);
-
-            MDC.put("traceId", cmd.getTraceId());
-
-            log.info("Received inventory.release.cmd: {}", cmd.getOrderId());
-
-            inventoryService.processRelease(cmd);
-
+                    objectMapper.readValue(record.value(), ReleaseInventoryCommand.class);
+            withMdc(record, cmd, "inventory.release.cmd", () -> {
+                log.info("Received inventory.release.cmd: {}", cmd.getOrderId());
+                inventoryService.processRelease(cmd);
+            });
         } catch (Exception e) {
-
             log.error("Inventory release failed", e);
             throw new RuntimeException(e);
-
-        } finally {
-            MDC.clear();
         }
     }
 
     @DltHandler
     public void onDeadLetter(ConsumerRecord<String, String> record) {
+        meterRegistry.counter("kafka.dlt.messages", "topic", record.topic()).increment();
         JsonNode payload = dltPayload(record);
         log.error("DLT topic={} sagaId={} orderId={} messageId={} failure={} payload={}",
                 record.topic(), first(header(record, "sagaId"), payload.path("sagaId").asText(null)),
@@ -148,6 +138,27 @@ public class InventoryCommandConsumer {
     private String header(ConsumerRecord<String, String> record, String name) {
         var header = record.headers().lastHeader(name);
         return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+    }
+
+    private void withMdc(ConsumerRecord<String, String> record, BaseEvent event,
+                         String eventType, Runnable action) {
+        putMdc("sagaId", first(header(record, "sagaId"), event.getSagaId()));
+        putMdc("orderId", first(header(record, "orderId"),
+                event.getOrderId() == null ? null : event.getOrderId().toString(), record.key()));
+        putMdc("messageId", first(header(record, "messageId"), messageId(record)));
+        putMdc("eventType", first(header(record, "eventType"), eventType));
+        putMdc("traceId", event.getTraceId());
+        try {
+            action.run();
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    private void putMdc(String key, String value) {
+        if (value != null && !value.isBlank()) {
+            MDC.put(key, value);
+        }
     }
 
 }

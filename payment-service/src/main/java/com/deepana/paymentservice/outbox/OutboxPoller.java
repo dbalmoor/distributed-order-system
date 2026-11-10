@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -55,15 +56,38 @@ public class OutboxPoller {
             try {
                 ProducerRecord<String, String> record = new ProducerRecord<>(
                         message.topic(), message.aggregateId(), message.payload());
-                objectMapper.readValue(message.headers(), HEADERS).forEach((name, value) ->
+                Map<String, String> headers = objectMapper.readValue(message.headers(), HEADERS);
+                setMdc(message, headers);
+                headers.forEach((name, value) ->
                         record.headers().add(name, value.getBytes(StandardCharsets.UTF_8)));
                 kafkaTemplate.send(record).get(10, TimeUnit.SECONDS);
             } catch (Exception e) {
                 log.error("Could not publish outbox message {}", message.messageId(), e);
                 transactions.markFailed(message.messageId(), e.toString());
                 continue;
+            } finally {
+                MDC.clear();
             }
             transactions.markPublished(message.messageId());
         }
+    }
+
+    private void setMdc(OutboxMessage message, Map<String, String> headers) {
+        MDC.put("sagaId", first(headers.get("sagaId")));
+        MDC.put("orderId", first(headers.get("orderId"), message.aggregateId()));
+        MDC.put("messageId", message.messageId().toString());
+        MDC.put("eventType", first(headers.get("eventType"), message.eventType()));
+        if (headers.containsKey("traceId")) {
+            MDC.put("traceId", headers.get("traceId"));
+        }
+    }
+
+    private String first(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "unknown";
     }
 }

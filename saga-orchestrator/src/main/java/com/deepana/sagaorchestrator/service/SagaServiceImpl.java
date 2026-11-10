@@ -26,7 +26,9 @@ import com.deepana.sagaorchestrator.repository.SagaAdminView;
 import com.deepana.sagaorchestrator.repository.SagaRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -76,6 +78,13 @@ public class SagaServiceImpl implements SagaService {
     @Value("${saga.retry-max-backoff:PT1M}")
     private Duration retryMaxBackoff;
 
+    @PostConstruct
+    void registerMetrics() {
+        Gauge.builder("saga.needs_attention", sagaRepository, SagaRepository::countNeedingAttention)
+                .description("Sagas awaiting operator attention")
+                .register(meterRegistry);
+    }
+
     @Override
     @Transactional
     public void handleOrderCreated(OrderCreatedEvent event, String messageId) {
@@ -91,6 +100,7 @@ public class SagaServiceImpl implements SagaService {
                 duplicate("order.created", messageId);
                 return;
             }
+            meterRegistry.counter("saga.started").increment();
             SagaSnapshot saga = sagaRepository.findBySagaIdForUpdate(sagaId)
                     .orElseThrow(() -> new IllegalStateException("Created saga row could not be reloaded"));
             sagaRepository.appendStepLog(sagaId, SagaStep.RESERVE_INVENTORY,
@@ -230,6 +240,9 @@ public class SagaServiceImpl implements SagaService {
                     sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(), 0);
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "order.confirmed",
                             saga.status(), transition.status(), serialize(event));
+                    if (transition.status() == SagaStatus.COMPLETED) {
+                        meterRegistry.counter("saga.completed").increment();
+                    }
                 }));
     }
 
@@ -241,6 +254,9 @@ public class SagaServiceImpl implements SagaService {
                     sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(), 0);
                     sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "order.cancelled",
                             saga.status(), transition.status(), serialize(event));
+                    if (transition.status() == SagaStatus.CANCELLED) {
+                        meterRegistry.counter("saga.cancelled").increment();
+                    }
                 }));
     }
 
@@ -248,6 +264,7 @@ public class SagaServiceImpl implements SagaService {
     public int handleExpiredSagas() {
         var expired = sagaRepository.findExpiredForUpdate();
         for (SagaSnapshot saga : expired) {
+            meterRegistry.counter("saga.timeouts", "step", saga.currentStep().name()).increment();
             if (saga.status() == SagaStatus.ACTIVE) {
                 handleActiveTimeout(saga);
             } else {
@@ -322,6 +339,9 @@ public class SagaServiceImpl implements SagaService {
         sagaRepository.updateState(saga.sagaId(), transition.status(), transition.step(), 0);
         sagaRepository.appendStepLog(saga.sagaId(), transition.step(), "ADMIN_FORCE_RESOLVE",
                 saga.status(), transition.status(), serialize(Map.of("operatorNote", operatorNote)));
+        if (transition.status() == SagaStatus.CANCELLED) {
+            meterRegistry.counter("saga.cancelled").increment();
+        }
     }
 
     private void handleActiveTimeout(SagaSnapshot saga) {
@@ -518,23 +538,36 @@ public class SagaServiceImpl implements SagaService {
     }
 
     private void duplicate(String eventType, String messageId) {
-        meterRegistry.counter("saga.messages.duplicates", "eventType", eventType).increment();
+        meterRegistry.counter("saga.duplicate.events").increment();
         log.info("Ignoring duplicate saga message {} for {}", messageId, eventType);
     }
 
     private void invalid(String eventType, String reason) {
-        meterRegistry.counter("saga.events.invalid", "eventType", eventType).increment();
+        meterRegistry.counter("saga.rejected.events").increment();
         log.warn("Ignoring invalid saga event {}: {}", eventType, reason);
     }
 
     private void withTrace(BaseEvent event, Runnable action) {
+        Map<String, String> previous = MDC.getCopyOfContextMap();
         if (event.getTraceId() != null) {
             MDC.put("traceId", event.getTraceId());
         }
+        putMdc("sagaId", event.getSagaId());
+        putMdc("orderId", event.getOrderId() == null ? null : event.getOrderId().toString());
         try {
             action.run();
         } finally {
-            MDC.clear();
+            if (previous == null) {
+                MDC.clear();
+            } else {
+                MDC.setContextMap(previous);
+            }
+        }
+    }
+
+    private void putMdc(String key, String value) {
+        if (value != null && !value.isBlank()) {
+            MDC.put(key, value);
         }
     }
 

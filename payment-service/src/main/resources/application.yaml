@@ -1,6 +1,12 @@
 server:
   port: 8083
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
 payment:
   fail-amount-threshold: ${PAYMENT_FAIL_AMOUNT_THRESHOLD:}
 
@@ -9,7 +15,7 @@ spring:
     name: payment-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/paymentdb
+    url: jdbc:postgresql://localhost:5434/paymentdb
     username: postgres
     password: postgres
 

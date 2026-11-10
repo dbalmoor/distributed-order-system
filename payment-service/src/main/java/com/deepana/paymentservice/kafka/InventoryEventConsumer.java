@@ -3,9 +3,11 @@ package com.deepana.paymentservice.kafka;
 import com.deepana.paymentservice.service.PaymentService;
 import com.deepana.saga.commondto.payment.ChargePaymentCommand;
 import com.deepana.saga.commondto.payment.RefundPaymentCommand;
+import com.deepana.saga.commondto.base.BaseEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.errors.RetriableException;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class InventoryEventConsumer {
 
     private final PaymentService paymentService;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     @RetryableTopic(
             attempts = "4",
@@ -50,19 +53,14 @@ public class InventoryEventConsumer {
             topics = "payment.charge.cmd",
             groupId = "${spring.kafka.consumer.group-id}"
     )
-    public void consume(String message) throws JsonProcessingException {
-
+    public void consume(ConsumerRecord<String, String> record) throws JsonProcessingException {
         try {
-
             ChargePaymentCommand cmd =
-                    objectMapper.readValue(message, ChargePaymentCommand.class);
-
-            MDC.put("traceId", cmd.getTraceId());
-
-            log.info("Received payment.charge.cmd {}", message);
-
-            paymentService.processPayment(cmd);
-
+                    objectMapper.readValue(record.value(), ChargePaymentCommand.class);
+            withMdc(record, cmd, "payment.charge.cmd", () -> {
+                log.info("Received payment.charge.cmd {}", record.value());
+                paymentService.processPayment(cmd);
+            });
         } finally {
             MDC.clear();
         }
@@ -83,12 +81,13 @@ public class InventoryEventConsumer {
             topics = "payment.refund.cmd",
             groupId = "${spring.kafka.consumer.group-id}"
     )
-    public void consumeRefund(String message) throws JsonProcessingException {
+    public void consumeRefund(ConsumerRecord<String, String> record) throws JsonProcessingException {
         try {
-            RefundPaymentCommand cmd = objectMapper.readValue(message, RefundPaymentCommand.class);
-            MDC.put("traceId", cmd.getTraceId());
-            log.info("Received payment.refund.cmd for order {}", cmd.getOrderId());
-            paymentService.processRefund(cmd);
+            RefundPaymentCommand cmd = objectMapper.readValue(record.value(), RefundPaymentCommand.class);
+            withMdc(record, cmd, "payment.refund.cmd", () -> {
+                log.info("Received payment.refund.cmd for order {}", cmd.getOrderId());
+                paymentService.processRefund(cmd);
+            });
         } finally {
             MDC.clear();
         }
@@ -96,6 +95,7 @@ public class InventoryEventConsumer {
 
     @DltHandler
     public void onDeadLetter(ConsumerRecord<String, String> record) {
+        meterRegistry.counter("kafka.dlt.messages", "topic", record.topic()).increment();
         JsonNode payload = dltPayload(record);
         log.error("DLT topic={} sagaId={} orderId={} messageId={} failure={} payload={}",
                 record.topic(), first(header(record, "sagaId"), payload.path("sagaId").asText(null)),
@@ -115,8 +115,35 @@ public class InventoryEventConsumer {
         }
     }
 
+    private String header(ConsumerRecord<String, String> record, String name) {
+        var header = record.headers().lastHeader(name);
+        return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+    }
+
+    private void withMdc(ConsumerRecord<String, String> record, BaseEvent event,
+                         String eventType, Runnable action) {
+        putMdc("sagaId", first(header(record, "sagaId"), event.getSagaId()));
+        putMdc("orderId", first(header(record, "orderId"),
+                event.getOrderId() == null ? null : event.getOrderId().toString(), record.key()));
+        putMdc("messageId", first(header(record, "messageId"), messageId(record)));
+        putMdc("eventType", first(header(record, "eventType"), eventType));
+        putMdc("traceId", event.getTraceId());
+        try {
+            action.run();
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    private void putMdc(String key, String value) {
+        if (value != null && !value.isBlank()) {
+            MDC.put(key, value);
+        }
+    }
+
     private String messageId(ConsumerRecord<String, String> record) {
-        return record.topic() + "-" + record.partition() + "-" + record.offset();
+        return first(header(record, "messageId"),
+                record.topic() + "-" + record.partition() + "-" + record.offset());
     }
 
     private String first(String... values) {
@@ -126,10 +153,5 @@ public class InventoryEventConsumer {
             }
         }
         return "unknown";
-    }
-
-    private String header(ConsumerRecord<String, String> record, String name) {
-        var header = record.headers().lastHeader(name);
-        return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
     }
 }

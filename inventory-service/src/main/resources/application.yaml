@@ -1,11 +1,17 @@
 server:
   port: 8082
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
 spring:
   application:
     name: inventory-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/inventorydb
+    url: jdbc:postgresql://localhost:5433/inventorydb
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver

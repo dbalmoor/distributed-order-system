@@ -12,6 +12,7 @@ import com.deepana.saga.commondto.payment.PaymentFailedEvent;
 import com.deepana.saga.commondto.payment.PaymentRefundedEvent;
 import com.deepana.saga.commondto.payment.RefundPaymentCommand;
 import com.deepana.saga.commondto.payment.PaymentSuccessEvent;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -35,6 +36,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentEventProducer producer;
     private final PaymentProperties paymentProperties;
     private final JdbcTemplate jdbcTemplate;
+    private final MeterRegistry meterRegistry;
 
     @Override
     @Transactional
@@ -74,6 +76,7 @@ public class PaymentServiceImpl implements PaymentService {
                             "Payment row not found after idempotent insert for saga " + cmd.getSagaId()));
 
             if (inserted == 0) {
+                meterRegistry.counter("payment.duplicate").increment();
                 log.info("Charge already processed for saga {}; re-emitting stored {} outcome",
                         cmd.getSagaId(), payment.getStatus());
             }
@@ -150,6 +153,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .orElseThrow(() -> new IllegalStateException(
                             "Refund marker not found after idempotent insert for saga " + cmd.getSagaId()));
             if (inserted == 0) {
+                meterRegistry.counter("payment.duplicate").increment();
                 log.info("Refund already processed for saga {}; re-emitting payment.refunded", cmd.getSagaId());
             } else if (charge == null) {
                 log.info("Recorded refund-before-charge marker for saga {}", cmd.getSagaId());
