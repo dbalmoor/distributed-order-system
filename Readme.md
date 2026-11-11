@@ -294,10 +294,14 @@ Kafka DLT messages. Micrometer Tracing with the OpenTelemetry bridge exports
 OTLP traces to Jaeger. Trace context is propagated through Kafka headers and
 persisted/restored at the transactional outbox boundary, linking HTTP, outbox,
 Kafka, and service operations. The success path was verified manually; see the
-order evidence and Jaeger screenshots below. The successful order-122 trace
-took 5.43 seconds end to end locally with the default 500 ms outbox poll
-interval. The payment-failure trace for order 124 was also verified manually;
-Jaeger uses in-memory storage and is for local development only.
+order evidence and Jaeger screenshots below. The outbox poller in each of the
+four services, including saga-orchestrator, defaults to a 500 ms fixed delay
+(`OUTBOX_POLL_INTERVAL_MS` can override it). Since each asynchronous outbox
+hop can wait for its service's next poll, this contributes to the roughly
+5-second end-to-end duration observed in Jaeger: 5.43 seconds for successful
+order 122 and 5.2 seconds for order 124's payment-failure/compensation trace.
+The payment-failure trace was also verified manually; Jaeger uses in-memory
+storage and is for local development only.
 Actuator endpoints are unauthenticated; there are no Grafana dashboards or
 alerting.
 
