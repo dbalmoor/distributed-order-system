@@ -184,7 +184,9 @@ topic names and their producer/consumer are:
 | `payment.refunded` | payment-service | saga-orchestrator |
 
 Messages carry identifiers including `messageId`, `sagaId`, `orderId`, and
-`traceId`. `sagaId` is a string UUID. Producer configuration enables
+`traceId`. The message `traceId` is a business correlation value; it is
+separate from the OpenTelemetry trace ID. Logs use the MDC key
+`correlationId` for business correlation. `sagaId` is a string UUID. Producer configuration enables
 idempotence and `acks=all`. Each service uses its configured consumer group
 (`order-group`, `inventory-group`, `payment-group`, or `saga-group`).
 Listeners use Spring Kafka retry topics with bounded attempts; retry topics are
@@ -277,12 +279,13 @@ routed through the gateway. Each operator action is recorded in
 `saga_step_log`. The gateway itself currently permits unauthenticated access;
 service ports should not be exposed publicly.
 
-Payment is a deterministic simulation, not a real payment provider. There is no
-OpenTelemetry distributed tracing, Prometheus metrics, Grafana dashboard,
-client `Idempotency-Key`, standardized API validation/error contract,
-authentication/authorization, chaos-lite harness, or schema registry. MDC
-correlation via `traceId` is not distributed tracing. Retry/DLT end-to-end
-behavior and DLT replay also lack dedicated automated integration coverage.
+Payment is a deterministic simulation, not a real payment provider. OpenTelemetry
+tracing exports to a local in-memory Jaeger instance and was manually verified
+across service and outbox hops; Prometheus metrics are exposed, but there are no
+Grafana dashboards or alerting. There is no client `Idempotency-Key`,
+standardized API validation/error contract, authentication/authorization,
+chaos-lite harness, or schema registry. Retry/DLT end-to-end behavior and DLT
+replay also lack dedicated automated integration coverage.
 The outstanding work is tracked in [requirement.md](requirement.md), and
 scenario-level test coverage is listed in the [failure matrix](docs/failure-matrix.md).
 

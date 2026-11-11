@@ -179,7 +179,9 @@ Saga state, audit log (`saga_step_log`), and outgoing outbox messages are writte
 | `payment.failed` | payment-service | saga-orchestrator |
 | `payment.refunded` | payment-service | saga-orchestrator |
 
-Messages carry `messageId`, `sagaId`, `orderId`, and `traceId`.
+Messages carry `messageId`, `sagaId`, `orderId`, and `traceId`. The message
+`traceId` is the business correlation value; the OpenTelemetry trace ID is
+separate. Business correlation is logged under the MDC key `correlationId`.
 
 ## Operator APIs
 
@@ -271,7 +273,7 @@ This section is deliberate; these are known gaps, not oversights.
 - **No authentication or authorization.** The gateway permits all requests; admin and DLT-replay endpoints are unauthenticated and not routed through the gateway. Do not expose service ports publicly.
 - **Payment is a simulation**, not a real provider.
 - **Inventory contention:** each item is reserved with an atomic conditional update in ascending product-ID order. A concurrency integration test verifies 50 competing commands against stock of 10 produce exactly 10 reservations and 40 failures without overselling.
-- **Observability:** Prometheus metrics via Micrometer (saga, outbox and duplicate counters); no Grafana dashboards or alerting; no OpenTelemetry tracing; Actuator endpoints are unauthenticated.
+- **Observability:** Micrometer/Prometheus metrics and OpenTelemetry tracing to an in-memory Jaeger instance are configured for local development; no Grafana dashboards or alerting; Actuator endpoints are unauthenticated.
 - **No client `Idempotency-Key`** on `POST /orders`: a client retry can create a second order.
 - **No standardized API validation or error contract.**
 - **No schema registry**, and no chaos or fault-injection harness.
@@ -281,17 +283,23 @@ Planned work is tracked in [requirement.md](requirement.md).
 
 ## Tech stack
 
-Java 17, Spring Boot 3.2.5, Spring Kafka, Spring Data JPA / Hibernate, PostgreSQL, Flyway, Apache Kafka (KRaft), Maven (multi-module), Testcontainers, Docker Compose.
+Java 17, Spring Boot 3.2.5, Spring Kafka, Spring Data JPA / Hibernate, PostgreSQL, Flyway, Apache Kafka (KRaft), Maven (multi-module), Testcontainers, Docker Compose, Micrometer, Prometheus, OpenTelemetry, Jaeger.
 
 ## Observability
 
 The four business services expose Micrometer metrics in Prometheus format at
 `/actuator/prometheus`. Available metrics include saga outcomes and
 `saga.needs_attention`, outbox backlog/publication, duplicate deliveries, and
-Kafka DLT messages. OpenTelemetry tracing exports to Jaeger and has been
-verified end to end across the order, saga-orchestrator, inventory, and payment
-services. Actuator endpoints are unauthenticated; no Grafana dashboards or
-alerting are included.
+Kafka DLT messages. Micrometer Tracing with the OpenTelemetry bridge exports
+OTLP traces to Jaeger. Trace context is propagated through Kafka headers and
+persisted/restored at the transactional outbox boundary, linking HTTP, outbox,
+Kafka, and service operations. The success path was verified manually; see the
+order evidence and Jaeger screenshots below. The successful order-122 trace
+took 5.43 seconds end to end locally with the default 500 ms outbox poll
+interval. The payment-failure trace for order 124 was also verified manually;
+Jaeger uses in-memory storage and is for local development only.
+Actuator endpoints are unauthenticated; there are no Grafana dashboards or
+alerting.
 
 The local happy-path walkthrough is documented in
 [order 122 end-to-end evidence](docs/evidence/order-122-e2e-2026-11-11.md).
@@ -300,7 +308,10 @@ The local happy-path walkthrough is documented in
 
 - [Successful order 120 walkthrough](docs/evidence/order-120-e2e-2026-11-10.md)
 - [Successful order 122 walkthrough with API and Jaeger screenshots](docs/evidence/order-122-e2e-2026-11-11.md)
+- [Jaeger success trace screenshot](docs/evidence/jaeger-trace-success.png)
 - [Cancelled order 121 failure walkthrough](docs/evidence/order-121-failure-2026-11-10.md)
+- [Order 124 payment-failure and compensation walkthrough](docs/evidence/order-124-payment-failure-2026-11-11.md)
+- [Jaeger order 124 failure trace screenshot](docs/evidence/jaeger-trace-failure.png)
 - [Inventory oversell integration test](inventory-service/src/test/java/com/deepana/inventoryservice/InventoryOutboxIntegrationTest.java#L172): 50 concurrent commands against stock 10; 10 reserved and 40 rejected.
 - [Outbox trace propagation integration test](order-service/src/test/java/com/deepana/orderservice/OutboxIntegrationTest.java): verifies that publishing an outbox message preserves the trace ID and creates a child span.
 - [GitHub Actions CI workflow and runs](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml)
