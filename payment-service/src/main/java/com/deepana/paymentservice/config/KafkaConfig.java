@@ -63,7 +63,9 @@ public class KafkaConfig {
     public KafkaTemplate<String, String> kafkaTemplate(
             ProducerFactory<String, String> producerFactory
     ) {
-        return new KafkaTemplate<>(producerFactory);
+        KafkaTemplate<String, String> kafkaTemplate = new KafkaTemplate<>(producerFactory);
+        kafkaTemplate.setObservationEnabled(true);
+        return kafkaTemplate;
     }
 
     // =====================================================
@@ -114,6 +116,7 @@ public class KafkaConfig {
 
         factory.setConsumerFactory(consumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+        factory.getContainerProperties().setObservationEnabled(true);
 
         return factory;
     }

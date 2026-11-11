@@ -17,6 +17,8 @@ import com.deepana.sagaorchestrator.service.SagaService;
 import com.deepana.sagaorchestrator.service.SagaServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -58,6 +60,8 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
     @Autowired private OutboxTransactions outboxTransactions;
     @Autowired private KafkaTemplate<String, String> kafkaTemplate;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private Tracer tracer;
+    @Autowired private Propagator propagator;
     @Autowired private MeterRegistry meterRegistry;
 
     @BeforeEach
@@ -439,7 +443,8 @@ class SagaPersistenceIntegrationTest extends IntegrationTestBase {
                     .isEqualTo(sagaId(created.getOrderId()));
             assertThat(record.headers().lastHeader("messageId")).isNotNull();
 
-            new OutboxPoller(outboxTransactions, kafkaTemplate, objectMapper, false, 50, 30_000).pollOnce();
+            new OutboxPoller(outboxTransactions, kafkaTemplate, objectMapper, tracer, propagator,
+                    false, 50, 30_000).pollOnce();
             assertThat(consumer.poll(Duration.ofSeconds(1))).isEmpty();
         }
     }

@@ -51,6 +51,7 @@ public class KafkaConsumerConfig {
 
         factory.setConsumerFactory(consumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+        factory.getContainerProperties().setObservationEnabled(true);
 
         return factory;
     }

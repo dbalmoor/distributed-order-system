@@ -42,7 +42,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public void processPayment(ChargePaymentCommand cmd) {
         try {
-            MDC.put("traceId", cmd.getTraceId());
+            MDC.put("correlationId", cmd.getTraceId());
 
             if (!isUuid(cmd.getSagaId())) {
                 throw new IllegalArgumentException("Payment charge command must include a sagaId UUID");
@@ -83,7 +83,7 @@ public class PaymentServiceImpl implements PaymentService {
 
             publishStoredOutcome(payment, cmd);
         } finally {
-            MDC.clear();
+            MDC.remove("correlationId");
         }
     }
 
@@ -128,7 +128,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public void processRefund(RefundPaymentCommand cmd) {
         try {
-            MDC.put("traceId", cmd.getTraceId());
+            MDC.put("correlationId", cmd.getTraceId());
             if (!isUuid(cmd.getSagaId())) {
                 throw new IllegalArgumentException("Payment refund command must include a sagaId UUID");
             }
@@ -170,7 +170,7 @@ public class PaymentServiceImpl implements PaymentService {
             event.setReason(cmd.getReason());
             producer.sendRefunded(event);
         } finally {
-            MDC.clear();
+            MDC.remove("correlationId");
         }
     }
 

@@ -2,6 +2,9 @@ package com.deepana.orderservice.outbox;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.MDC;
@@ -25,6 +28,8 @@ public class OutboxPoller {
     private final OutboxTransactions transactions;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final Tracer tracer;
+    private final Propagator propagator;
     private final boolean enabled;
     private final int batchSize;
     private final long leaseMillis;
@@ -33,12 +38,16 @@ public class OutboxPoller {
             OutboxTransactions transactions,
             KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
+            Tracer tracer,
+            Propagator propagator,
             @Value("${outbox.poller.enabled:true}") boolean enabled,
             @Value("${outbox.poller.batch-size:50}") int batchSize,
             @Value("${outbox.poller.lease-ms:30000}") long leaseMillis) {
         this.transactions = transactions;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
+        this.tracer = tracer;
+        this.propagator = propagator;
         this.enabled = enabled;
         this.batchSize = batchSize;
         this.leaseMillis = leaseMillis;
@@ -54,20 +63,35 @@ public class OutboxPoller {
     public void pollOnce() {
         transactions.resetExpiredLeases();
         for (OutboxMessage message : transactions.claim(batchSize, leaseMillis)) {
+            Map<String, String> previous = MDC.getCopyOfContextMap();
+            Span span = null;
             try {
                 ProducerRecord<String, String> record = new ProducerRecord<>(
                         message.topic(), message.aggregateId(), message.payload());
                 Map<String, String> headers = objectMapper.readValue(message.headers(), HEADERS);
                 setMdc(message, headers);
-                headers.forEach((name, value) ->
-                        record.headers().add(name, value.getBytes(StandardCharsets.UTF_8)));
-                kafkaTemplate.send(record).get(10, TimeUnit.SECONDS);
+                headers.forEach((name, value) -> {
+                    if (!isPropagationHeader(name)) {
+                        record.headers().add(name, value.getBytes(StandardCharsets.UTF_8));
+                    }
+                });
+                span = propagator.extract(headers, (carrier, key) -> carrier.get(key))
+                        .name("outbox.publish").start();
+                span.tag("messaging.destination.name", message.topic());
+                span.tag("orderId", value(first(headers.get("orderId"), message.aggregateId())));
+                span.tag("sagaId", value(headers.get("sagaId")));
+                try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
+                    kafkaTemplate.send(record).get(10, TimeUnit.SECONDS);
+                }
             } catch (Exception e) {
                 log.error("Could not publish outbox message {}", message.messageId(), e);
                 transactions.markFailed(message.messageId(), e.toString());
                 continue;
             } finally {
-                MDC.clear();
+                if (span != null) {
+                    span.end();
+                }
+                restoreMdc(previous);
             }
             transactions.markPublished(message.messageId());
         }
@@ -78,8 +102,16 @@ public class OutboxPoller {
         MDC.put("orderId", value(first(headers.get("orderId"), message.aggregateId())));
         MDC.put("messageId", message.messageId().toString());
         MDC.put("eventType", value(first(headers.get("eventType"), message.eventType())));
-        if (headers.containsKey("traceId")) {
-            MDC.put("traceId", headers.get("traceId"));
+        if (headers.containsKey("correlationId")) {
+            MDC.put("correlationId", headers.get("correlationId"));
+        }
+    }
+
+    private void restoreMdc(Map<String, String> context) {
+        if (context == null) {
+            MDC.clear();
+        } else {
+            MDC.setContextMap(context);
         }
     }
 
@@ -94,5 +126,11 @@ public class OutboxPoller {
 
     private String value(String value) {
         return first(value);
+    }
+
+    private boolean isPropagationHeader(String name) {
+        return "traceparent".equalsIgnoreCase(name)
+                || "tracestate".equalsIgnoreCase(name)
+                || "baggage".equalsIgnoreCase(name);
     }
 }

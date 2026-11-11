@@ -4,6 +4,7 @@ import com.deepana.orderservice.dto.request.CreateOrderRequestDTO;
 import com.deepana.orderservice.dto.response.OrderResponseDTO;
 import com.deepana.orderservice.service.OrderService;
 
+import io.micrometer.tracing.Tracer;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class OrderController {
 
     private final OrderService orderService;
+    private final Tracer tracer;
 
     // ================= CREATE =================
 
@@ -29,25 +31,27 @@ public class OrderController {
             @Valid @RequestBody CreateOrderRequestDTO request
     ) {
 
-        // Generate traceId at entry point
-        String traceId = "ORD-" + UUID.randomUUID()
+        String correlationId = "ORD-" + UUID.randomUUID()
                 .toString()
                 .substring(0, 8)
                 .toUpperCase();
 
-        MDC.put("traceId", traceId);
+        MDC.put("correlationId", correlationId);
 
         try {
 
             OrderResponseDTO response =
                     orderService.createOrder(request);
+            if (tracer.currentSpan() != null) {
+                tracer.currentSpan().tag("orderId", response.getId().toString());
+            }
 
             return ResponseEntity
                     .status(HttpStatus.CREATED)
                     .body(response);
 
         } finally {
-            MDC.clear();
+            MDC.remove("correlationId");
         }
     }
 

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 public class SagaLogger {
 
     private static final String FORMAT =
-            "[SAGA] [SERVICE:%s] [TRACE:%s] [ORDER:%s] [STEP:%s] [STATUS:%s] at %s";
+            "[SAGA] [SERVICE:%s] [CORRELATION:%s] [ORDER:%s] [STEP:%s] [STATUS:%s] at %s";
 
     public static void log(
             String service,
@@ -18,14 +18,14 @@ public class SagaLogger {
             String status
     ) {
 
-        String traceId = MDC.get("traceId");
+        String correlationId = MDC.get("correlationId");
         if (orderNumber == null) {
-            orderNumber = traceId; // fallback
+            orderNumber = correlationId; // fallback
         }
         String message = String.format(
                 FORMAT,
                 service,
-                traceId,
+                correlationId,
                 orderNumber,
                 step,
                 status,
@@ -51,4 +51,3 @@ public class SagaLogger {
         log(service, orderNumber, step, "FAILED");
     }
 }
-

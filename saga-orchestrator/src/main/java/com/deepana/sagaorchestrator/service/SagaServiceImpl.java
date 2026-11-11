@@ -550,7 +550,7 @@ public class SagaServiceImpl implements SagaService {
     private void withTrace(BaseEvent event, Runnable action) {
         Map<String, String> previous = MDC.getCopyOfContextMap();
         if (event.getTraceId() != null) {
-            MDC.put("traceId", event.getTraceId());
+            MDC.put("correlationId", event.getTraceId());
         }
         putMdc("sagaId", event.getSagaId());
         putMdc("orderId", event.getOrderId() == null ? null : event.getOrderId().toString());

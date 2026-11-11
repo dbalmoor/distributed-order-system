@@ -8,6 +8,9 @@ import com.deepana.orderservice.repository.OrderRepository;
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -19,12 +22,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -39,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "outbox.poller.enabled=false")
+@AutoConfigureObservability
 class OutboxIntegrationTest extends IntegrationTestBase {
 
     @Autowired private JdbcTemplate jdbcTemplate;
@@ -48,6 +54,8 @@ class OutboxIntegrationTest extends IntegrationTestBase {
     @Autowired private OutboxPoller outboxPoller;
     @Autowired private KafkaTemplate<String, String> kafkaTemplate;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private Tracer tracer;
+    @Autowired private Propagator propagator;
     @Autowired private PlatformTransactionManager transactionManager;
 
     @BeforeEach
@@ -91,6 +99,35 @@ class OutboxIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    void traceContextSurvivesOutboxPublication() throws Exception {
+        String topic = topicName();
+        Long orderId = 504L;
+        Span parent = tracer.nextSpan().name("test.order.create").start();
+        String storedTraceparent;
+        try (Tracer.SpanInScope ignored = tracer.withSpan(parent)) {
+            new TransactionTemplate(transactionManager).execute(status ->
+                    outboxWriter.write("ORDER", topic, "order.created", event(orderId)));
+            storedTraceparent = jdbcTemplate.queryForObject(
+                    "SELECT headers ->> 'traceparent' FROM outbox WHERE aggregate_id = ?",
+                    String.class, orderId.toString());
+        } finally {
+            parent.end();
+        }
+
+        assertThat(storedTraceparent).isNotBlank();
+        try (KafkaConsumer<String, String> consumer = consumer(topic)) {
+            outboxPoller.pollOnce();
+            ConsumerRecord<String, String> record = pollRecord(consumer);
+            String publishedTraceparent = new String(
+                    record.headers().lastHeader("traceparent").value(), StandardCharsets.UTF_8);
+            assertThat(publishedTraceparent.split("-")[1])
+                    .isEqualTo(storedTraceparent.split("-")[1]);
+            assertThat(publishedTraceparent.split("-")[2])
+                    .isNotEqualTo(storedTraceparent.split("-")[2]);
+        }
+    }
+
+    @Test
     void committedMessageSurvivesPollerRestartAndPublishesOnce() throws Exception {
         String topic = topicName();
         Long orderId = 502L;
@@ -102,7 +139,8 @@ class OutboxIntegrationTest extends IntegrationTestBase {
             assertThat(first.headers().lastHeader("messageId")).isNotNull();
 
             OutboxPoller restartedPoller = new OutboxPoller(
-                    outboxTransactions, kafkaTemplate, objectMapper, false, 50, 30_000);
+                    outboxTransactions, kafkaTemplate, objectMapper, tracer, propagator,
+                    false, 50, 30_000);
             restartedPoller.pollOnce();
             assertThat(consumer.poll(Duration.ofSeconds(1))).isEmpty();
         }
@@ -115,7 +153,8 @@ class OutboxIntegrationTest extends IntegrationTestBase {
         insertOutbox(topic, orderId);
         try (KafkaConsumer<String, String> consumer = consumer(topic)) {
             OutboxPoller secondInstance = new OutboxPoller(
-                    outboxTransactions, kafkaTemplate, objectMapper, false, 50, 30_000);
+                    outboxTransactions, kafkaTemplate, objectMapper, tracer, propagator,
+                    false, 50, 30_000);
             CountDownLatch start = new CountDownLatch(1);
             ExecutorService executor = Executors.newFixedThreadPool(2);
             try {

@@ -7,6 +7,7 @@ import com.deepana.saga.commondto.base.BaseEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micrometer.tracing.Tracer;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.errors.RetriableException;
@@ -27,6 +28,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLTransientException;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 @Slf4j
@@ -37,6 +39,7 @@ public class InventoryEventConsumer {
     private final PaymentService paymentService;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final Tracer tracer;
 
     @RetryableTopic(
             attempts = "4",
@@ -54,16 +57,12 @@ public class InventoryEventConsumer {
             groupId = "${spring.kafka.consumer.group-id}"
     )
     public void consume(ConsumerRecord<String, String> record) throws JsonProcessingException {
-        try {
-            ChargePaymentCommand cmd =
-                    objectMapper.readValue(record.value(), ChargePaymentCommand.class);
-            withMdc(record, cmd, "payment.charge.cmd", () -> {
-                log.info("Received payment.charge.cmd {}", record.value());
-                paymentService.processPayment(cmd);
-            });
-        } finally {
-            MDC.clear();
-        }
+        ChargePaymentCommand cmd =
+                objectMapper.readValue(record.value(), ChargePaymentCommand.class);
+        withMdc(record, cmd, "payment.charge.cmd", () -> {
+            log.info("Received payment.charge.cmd {}", record.value());
+            paymentService.processPayment(cmd);
+        });
     }
 
     @RetryableTopic(
@@ -82,15 +81,11 @@ public class InventoryEventConsumer {
             groupId = "${spring.kafka.consumer.group-id}"
     )
     public void consumeRefund(ConsumerRecord<String, String> record) throws JsonProcessingException {
-        try {
-            RefundPaymentCommand cmd = objectMapper.readValue(record.value(), RefundPaymentCommand.class);
-            withMdc(record, cmd, "payment.refund.cmd", () -> {
-                log.info("Received payment.refund.cmd for order {}", cmd.getOrderId());
-                paymentService.processRefund(cmd);
-            });
-        } finally {
-            MDC.clear();
-        }
+        RefundPaymentCommand cmd = objectMapper.readValue(record.value(), RefundPaymentCommand.class);
+        withMdc(record, cmd, "payment.refund.cmd", () -> {
+            log.info("Received payment.refund.cmd for order {}", cmd.getOrderId());
+            paymentService.processRefund(cmd);
+        });
     }
 
     @DltHandler
@@ -122,16 +117,37 @@ public class InventoryEventConsumer {
 
     private void withMdc(ConsumerRecord<String, String> record, BaseEvent event,
                          String eventType, Runnable action) {
+        Map<String, String> previous = MDC.getCopyOfContextMap();
+        tagCurrentSpan(event);
         putMdc("sagaId", first(header(record, "sagaId"), event.getSagaId()));
         putMdc("orderId", first(header(record, "orderId"),
                 event.getOrderId() == null ? null : event.getOrderId().toString(), record.key()));
         putMdc("messageId", first(header(record, "messageId"), messageId(record)));
         putMdc("eventType", first(header(record, "eventType"), eventType));
-        putMdc("traceId", event.getTraceId());
+        putMdc("correlationId", event.getTraceId());
         try {
             action.run();
         } finally {
+            restoreMdc(previous);
+        }
+    }
+
+    private void tagCurrentSpan(BaseEvent event) {
+        if (tracer.currentSpan() != null) {
+            if (event.getSagaId() != null) {
+                tracer.currentSpan().tag("sagaId", event.getSagaId());
+            }
+            if (event.getOrderId() != null) {
+                tracer.currentSpan().tag("orderId", event.getOrderId().toString());
+            }
+        }
+    }
+
+    private void restoreMdc(Map<String, String> context) {
+        if (context == null) {
             MDC.clear();
+        } else {
+            MDC.setContextMap(context);
         }
     }
 

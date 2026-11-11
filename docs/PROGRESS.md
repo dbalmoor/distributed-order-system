@@ -9,7 +9,7 @@
 | 5 Compensation, timeouts, watchdog | Done | NEEDS_ATTENTION + admin retry/force-resolve |
 | 6 Retry topics, DLT, replay | Done | tag v0.6-phase6; no automated retry/DLT/replay tests |
 | 7a Metrics + log correlation | Done | Verified 2026-11-10; `mvn -B verify` on JDK 17: 58 tests, 0 failures; success and failure walkthroughs + Prometheus screenshots in [evidence](evidence/order-120-e2e-2026-11-10.md) |
-| 7b OpenTelemetry tracing | Skipped | Not implemented |
+| 7b OpenTelemetry tracing | Done | Testcontainers verifies outbox trace propagation; runtime Jaeger trace verified across 4 services and 22 spans on 2026-11-11 |
 | 8 README, ADRs, failure matrix | Done | refresh after Phase 7 |
 
 ## Next (in order)

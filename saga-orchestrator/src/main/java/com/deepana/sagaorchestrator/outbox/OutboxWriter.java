@@ -3,6 +3,8 @@ package com.deepana.sagaorchestrator.outbox;
 import com.deepana.saga.commondto.base.BaseEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,6 +22,8 @@ public class OutboxWriter {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final Tracer tracer;
+    private final Propagator propagator;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID write(String topic, BaseEvent event) {
@@ -31,7 +35,12 @@ public class OutboxWriter {
         headers.put("messageId", messageId.toString());
         putIfPresent(headers, "sagaId", event.getSagaId());
         headers.put("orderId", event.getOrderId().toString());
-        putIfPresent(headers, "traceId", MDC.get("traceId") != null ? MDC.get("traceId") : event.getTraceId());
+        putIfPresent(headers, "correlationId",
+                MDC.get("correlationId") != null ? MDC.get("correlationId") : event.getTraceId());
+        if (tracer.currentSpan() != null) {
+            propagator.inject(tracer.currentSpan().context(), headers,
+                    (carrier, key, value) -> carrier.put(key, value));
+        }
         headers.put("eventType", topic);
         try {
             jdbcTemplate.update("""

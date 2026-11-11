@@ -288,17 +288,21 @@ Java 17, Spring Boot 3.2.5, Spring Kafka, Spring Data JPA / Hibernate, PostgreSQ
 The four business services expose Micrometer metrics in Prometheus format at
 `/actuator/prometheus`. Available metrics include saga outcomes and
 `saga.needs_attention`, outbox backlog/publication, duplicate deliveries, and
-Kafka DLT messages. Actuator endpoints are currently unauthenticated; no
-Grafana dashboards or OpenTelemetry tracing are implemented.
+Kafka DLT messages. OpenTelemetry tracing exports to Jaeger and has been
+verified end to end across the order, saga-orchestrator, inventory, and payment
+services. Actuator endpoints are unauthenticated; no Grafana dashboards or
+alerting are included.
 
 The local happy-path walkthrough is documented in
-[order 120 end-to-end evidence](docs/evidence/order-120-e2e-2026-11-10.md).
+[order 122 end-to-end evidence](docs/evidence/order-122-e2e-2026-11-11.md).
 
 ## Evidence
 
 - [Successful order 120 walkthrough](docs/evidence/order-120-e2e-2026-11-10.md)
+- [Successful order 122 walkthrough with API and Jaeger screenshots](docs/evidence/order-122-e2e-2026-11-11.md)
 - [Cancelled order 121 failure walkthrough](docs/evidence/order-121-failure-2026-11-10.md)
 - [Inventory oversell integration test](inventory-service/src/test/java/com/deepana/inventoryservice/InventoryOutboxIntegrationTest.java#L172): 50 concurrent commands against stock 10; 10 reserved and 40 rejected.
+- [Outbox trace propagation integration test](order-service/src/test/java/com/deepana/orderservice/OutboxIntegrationTest.java): verifies that publishing an outbox message preserves the trace ID and creates a child span.
 - [GitHub Actions CI workflow and runs](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml)
 - Prometheus targets screenshot:
   ![All four Prometheus service targets are UP](docs/evidence/prometheus-targets-2026-11-10.png)
