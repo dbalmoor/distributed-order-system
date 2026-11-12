@@ -30,6 +30,10 @@ payments at or above `1000.00`.
 - `GET /orders/124` returned `CANCELLED` (`displayStatus: CANCELLED`).
 - The payment record is `FAILED`; the saga is `CANCELLED`.
 - Inventory markers show both `RESERVE` and `RELEASED` for this order and saga.
+- Product 3's 2-unit reservation was released: available/reserved returned to
+  **95/5 before** → **93/7 while reserved** → **95/5 after**. The final
+  aggregate includes other orders; no other inventory event was recorded
+  during this order's reserve/release interval.
 - Saga history shows `order.created` → `inventory.reserved` →
   `payment.failed` → `inventory.release.cmd` → `inventory.released` →
   `order.cancel.cmd` → `order.cancelled`.

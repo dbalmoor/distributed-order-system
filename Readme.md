@@ -8,7 +8,7 @@ Event-driven order processing with a **persisted Saga orchestrator**, **transact
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Flyway-blue)
 [![CI](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml/badge.svg)](https://github.com/dbalmoor/distributed-order-system/actions/workflows/ci.yml)
 
-> This is a learning and portfolio project. Payment is a deterministic simulation, and several production concerns (auth, dashboards, and distributed tracing) are intentionally not built yet. See [Known limitations](#known-limitations).
+> This is a learning and portfolio project. Payment is a deterministic simulation, and several production concerns (auth, dashboards, alerting) are intentionally not built yet. See [Known limitations](#known-limitations).
 
 ---
 
@@ -17,7 +17,7 @@ Event-driven order processing with a **persisted Saga orchestrator**, **transact
 A client places an order. The system reserves inventory, charges payment, and confirms the order, each step owned by a separate service with its own database. If any step fails, times out, or is cancelled, the orchestrator compensates in the right order and leaves the order in a consistent final state.
 
 - No distributed (2PC) transactions: consistency comes from a saga plus local transactions.
-- Delivery is **at-least-once**. Every consumer is safe against duplicates and late events.
+- Delivery is **at-least-once**. Consumers are designed to tolerate duplicates and late events; per-scenario test coverage is in the failure matrix.
 - Stuck workflows are detected and recovered automatically, and escalated to an operator when automatic recovery is exhausted.
 
 ## Architecture
@@ -110,10 +110,11 @@ Scenarios considered (automated coverage is listed in the [failure matrix](docs/
 13. Release before reserve is blocked by the `RELEASED` marker.
 14. Refund before charge is blocked by the `REFUNDED` marker.
 15. Cancellation after the payment pivot is rejected; the order completes.
-16. Poison message routes to DLT and can be replayed (**NO TEST**).
+16. Poison message routes to DLT and can be replayed (manually verified, no automated test).
 
-Three scenarios lack dedicated automated coverage: orchestrator crash recovery,
-duplicate inventory reserve behavior, and poison-to-DLT routing/non-blocking/replay.
+Two scenarios lack dedicated automated coverage: orchestrator crash recovery
+and duplicate inventory reserve behavior. Poison-to-DLT routing and replay
+were manually verified, but have no automated test.
 
 ### Saga state machine
 
@@ -246,16 +247,21 @@ The response is `202` with an order id. Poll `GET /orders/{id}` for the result (
 
 `mvn -B verify` runs unit and integration tests. Integration tests use **Testcontainers** for Kafka and PostgreSQL, so Docker must be available.
 
-| Module | Test classes |
-|---|---|
-| `common-dto` | `CommonDtoApplicationTests`, `DocumentationConsistencyTest` |
-| `order-service` | `OrderStateMachineIntegrationTest`, `OrderStateMachineTest`, `OutboxIntegrationTest`, `OrderServiceApplicationTests` |
-| `inventory-service` | `InventoryOutboxIntegrationTest`, `InventoryServiceImplTest`, `InventoryServiceApplicationTests` |
-| `payment-service` | `PaymentIdempotencyIntegrationTest`, `PaymentServiceApplicationTests` |
-| `saga-orchestrator` | `SagaPersistenceIntegrationTest`, `SagaStateMachineTest`, `SagaOrchestratorApplicationTests` |
-| `gateway-service` | `GatewayServiceApplicationTests` |
+Latest full verification: **59 tests** (unit + Testcontainers integration),
+**0 failures**. The [latest CI run](https://github.com/dbalmoor/distributed-order-system/actions/runs/42976352808)
+completed in **2m24s**. Per-module test counts:
 
-Not yet covered by dedicated automated integration tests: end-to-end retry/DLT behaviour and DLT replay.
+| Module | Tests | Test classes |
+|---|---:|---|
+| `common-dto` | 2 | `CommonDtoApplicationTests`, `DocumentationConsistencyTest` |
+| `order-service` | 21 | `OrderStateMachineIntegrationTest`, `OrderStateMachineTest`, `OutboxIntegrationTest`, `OrderServiceApplicationTests` |
+| `inventory-service` | 9 | `InventoryOutboxIntegrationTest`, `InventoryServiceImplTest`, `InventoryServiceApplicationTests` |
+| `payment-service` | 7 | `PaymentIdempotencyIntegrationTest`, `PaymentServiceApplicationTests` |
+| `saga-orchestrator` | 19 | `SagaPersistenceIntegrationTest`, `SagaStateMachineTest`, `SagaOrchestratorApplicationTests` |
+| `gateway-service` | 1 | `GatewayServiceApplicationTests` |
+
+The poison-message/DLT scenario was manually verified; it has no automated test.
+Other gaps are listed in the [failure matrix](docs/failure-matrix.md).
 
 ## Design decisions
 
@@ -328,7 +334,7 @@ The local happy-path walkthrough is documented in
 
 - [As-built design](design.md) 
 - [Failure matrix](docs/failure-matrix.md)
-- [Requirements and roadmap](requirement.md)
+
 
 ## Author
 

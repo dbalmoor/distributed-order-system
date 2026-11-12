@@ -17,7 +17,7 @@
 | Release before reserve | `RELEASED` marker makes the later reserve fail | No stock held | Race test | `InventoryOutboxIntegrationTest#releaseBeforeReserveWritesMarkerAndPreventsLaterStockHold` |
 | Refund before charge | `REFUNDED` marker makes the later charge fail | No charge | Race test | `PaymentIdempotencyIntegrationTest#refundBeforeChargeCreatesMarkerAndRejectsLaterCharge` |
 | Cancel request after the pivot | Rejected; order continues to `COMPLETED` | Order `COMPLETED` | Cancel-too-late test | `SagaPersistenceIntegrationTest#cancelRequestsBeforePivotWaitForRequiredCompensationAcknowledgments` |
-| Poison message | Routed to the DLT, replayed after review | Consumer not blocked | DLT test | NO TEST |
+| Poison message | Routed to the DLT and replayed after review; later messages are not blocked | Consumer not blocked | No automated test | Manually verified; no automated test |
 | Concurrent reservations for the last units | Atomic conditional update; losers get `inventory.failed` | Never oversold, stock never negative | Oversell test | `InventoryOutboxIntegrationTest#concurrentReservationsNeverOversellLimitedStock` (50 commands, stock 10: 10 succeed, 40 fail) |
 | Multi-item reservation failure | Later item is unavailable; earlier stock is restored and failure is recorded | No partial reservation; `inventory.failed` and failure marker committed | Multi-item failure test | `InventoryOutboxIntegrationTest#multiItemReservationFailureRestoresEarlierStockAndCommitsFailure` |
 
@@ -25,4 +25,4 @@
 
 - Orchestrator process crash and recovery mid-saga
 - Duplicate `inventory.reserve.cmd`
-- Poison-to-DLT routing, non-blocking of later messages, and DLT replay
+- Poison-to-DLT routing, non-blocking of later messages, and DLT replay (manually verified, no automated test)
